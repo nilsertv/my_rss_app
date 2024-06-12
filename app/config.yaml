@@ -1,0 +1,8 @@
+interval: 3600  # Intervalo en segundos
+websites:
+  - url: "https://example.com/latest-post"
+    type: "web"
+  - url: "https://www.youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"
+    type: "youtube"
+log_file: "app.log"
+history_file: "history.json"
