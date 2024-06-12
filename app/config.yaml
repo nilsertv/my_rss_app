@@ -1,8 +1,14 @@
 interval: 3600  # Intervalo en segundos
 websites:
-  - url: "https://example.com/latest-post"
+  - url: "https://www.idl-reporteros.pe/feed/"
     type: "web"
-  - url: "https://www.youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"
+  - url: "https://ojo-publico.com/rss.xml"
+    type: "web"
+  - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC5j8-2FT0ZMMBkmK72R4aeA"
     type: "youtube"
+  - url: "https://www.bbc.com/mundo"
+    type: "web"
+  - url: "https://elcomercio.pe/"
+    type: "web"
 log_file: "app.log"
 history_file: "history.json"
