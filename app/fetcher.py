@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 class Fetcher:
     def __init__(self, config):
         self.logger = logging.getLogger('RSSLogger')
-        self.websites = config['websites']
+        self.sections = config['sections']
         self.history_file = config['history_file']
         self.history = self.load_history()
 
@@ -27,13 +27,13 @@ class Fetcher:
             json.dump(self.history, file)
         self.logger.info(f"Saved history to {self.history_file}")
 
-    def fetch_latest(self):
+    def fetch_latest(self, sources):
         latest_posts = []
-        for site in self.websites:
-            if site['type'] == 'web':
-                latest_post = self.fetch_web(site['url'])
-            elif site['type'] == 'youtube':
-                latest_post = self.fetch_youtube(site['url'])
+        for source in sources:
+            if source['type'] == 'web':
+                latest_post = self.fetch_web(source['url'])
+            elif source['type'] == 'youtube':
+                latest_post = self.fetch_youtube(source['url'])
 
             if latest_post and not self.is_post_in_history(latest_post):
                 latest_posts.append(latest_post)
@@ -64,15 +64,13 @@ class Fetcher:
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'lxml')
         
-        # Ajusta los selectores según la estructura de la página web específica
-        # Aquí estamos asumiendo que la última entrada está dentro de un div con clase 'latest-news'
         article = soup.find('div', class_='latest-news')
         if article:
-            title_tag = article.find('h1') or article.find('h2') or article.find('h3')  # Intenta con varios selectores
+            title_tag = article.find('h1') or article.find('h2') or article.find('h3')
             title = title_tag.get_text(strip=True) if title_tag else "No Title"
             content = article.get_text(strip=True)
             link_tag = article.find('a', href=True)
-            link = link_tag['href'] if link_tag else url  # Usa la URL original si no se encuentra un enlace específico
+            link = link_tag['href'] if link_tag else url
             self.logger.info(f"Fetched HTML content from {url}")
             return {"url": link, "title": title, "content": content}
         self.logger.error(f"No valid article found at {url}")

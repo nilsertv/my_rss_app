@@ -19,13 +19,20 @@ async def main():
     while True:
         logger.info("Fetching latest posts...")
         try:
-            latest_posts = fetcher.fetch_latest()
-            if latest_posts:
-                logger.info(f"Latest posts fetched: {latest_posts}")
+            all_latest_posts = []
+            for section, sources in config['sections'].items():
+                logger.info(f"Fetching posts for section: {section}")
+                latest_posts = fetcher.fetch_latest(sources)
+                for post in latest_posts:
+                    post['section'] = section
+                all_latest_posts.extend(latest_posts)
+            
+            if all_latest_posts:
+                logger.info(f"Latest posts fetched: {all_latest_posts}")
             else:
                 logger.warning("No latest posts fetched.")
             
-            rss_generator = RSSGenerator(latest_posts)
+            rss_generator = RSSGenerator(all_latest_posts)
             rss_file_path = 'feed.xml'
             rss_generator.save_rss(filename=rss_file_path)
             logger.info(f"RSS feed updated at {rss_file_path}.")

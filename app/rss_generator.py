@@ -1,5 +1,4 @@
 from xml.etree.ElementTree import Element, SubElement, tostring, ElementTree
-import datetime
 import logging
 
 class RSSGenerator:
@@ -25,14 +24,15 @@ class RSSGenerator:
         for post in self.posts:
             item = SubElement(channel, 'item')
 
-            title = SubElement(item, 'title')
-            title.text = post.get('title', 'No Title')
+            item_title = SubElement(item, 'title')
+            item_title.text = f"#{section} {post.get('title', 'No Title')}"
 
-            link = SubElement(item, 'link')
-            link.text = post.get('url', 'No URL')
+            item_link = SubElement(item, 'link')
+            item_link.text = post.get('url', 'No URL')
 
-            description = SubElement(item, 'description')
-            description.text = post.get('content', 'No Content')
+            item_description = SubElement(item, 'description')
+            section = post.get('section', 'General')
+            item_description.text = post.get('content', 'No Content')
 
         self.logger.info("RSS feed generated.")
         return ElementTree(rss)
