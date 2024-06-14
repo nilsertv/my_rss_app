@@ -2,3 +2,4 @@ aiohttp
 PyYAML
 feedparser
 requests
+beautifulsoup4
