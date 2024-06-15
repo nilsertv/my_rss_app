@@ -13,6 +13,7 @@ with open('config.json', 'r') as config_file:
     config = json.load(config_file)
 
 ifttt_webhook_url = config['ifttt_webhook_url']
+delay_seconds = config.get('delay_seconds', 225)  # Valor predeterminado de 225 segundos
 
 async def read_rss(filename):
     tree = ET.parse(filename)
@@ -54,6 +55,8 @@ async def process_entries(entries):
 
             logging.info(f"Processing entry: {entry['title']}")
             await post_to_ifttt(entry)
+            logging.info(f"Waiting for {delay_seconds} seconds before processing the next entry...")
+            await asyncio.sleep(delay_seconds)
     except Exception as e:
         logging.error(f"Error processing entries: {e}")
 
