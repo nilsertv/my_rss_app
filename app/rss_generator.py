@@ -23,7 +23,8 @@ class RSSGenerator:
 
         for post in self.posts:
             item = SubElement(channel, 'item')
-
+            
+            section = post.get('section', 'General')
             item_title = SubElement(item, 'title')
             item_title.text = f"#{section} {post.get('title', 'No Title')}"
 
@@ -31,7 +32,6 @@ class RSSGenerator:
             item_link.text = post.get('url', 'No URL')
 
             item_description = SubElement(item, 'description')
-            section = post.get('section', 'General')
             item_description.text = post.get('content', 'No Content')
 
         self.logger.info("RSS feed generated.")

@@ -62,7 +62,7 @@ class Fetcher:
     def fetch_html_page(self, url):
         self.logger.info(f"Fetching HTML content from {url}")
         response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'lxml')
+        soup = BeautifulSoup(response.text, 'html.parser')
         
         article = soup.find('div', class_='latest-news')
         if article:

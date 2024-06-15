@@ -25,12 +25,16 @@ sections:
       type: "web"
     - url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/america/portada"
       type: "web"
+    - url: "http://rss.dw.com/rdf/rss-sp-inter"
+      type: "web"
   Tech:
     - url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/tecnologia/portada"
       type: "web"
     - url: "https://www.perfil.com/feed/tecnologia"
       type: "web"
     - url: "https://www.muyinteresante.com/rss/tecnologia.xml"
+      type: "web"
+    - url: "http://rss.dw.com/rdf/rss-sp-cyt"
       type: "web"
   Curiosidades:
     - url: "https://www.muyinteresante.com/rss/curiosidades.xml"
