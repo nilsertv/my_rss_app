@@ -4,7 +4,6 @@ import json
 import logging
 import asyncio
 import aiohttp
-import time
 
 # Configurar el logger
 logging.basicConfig(filename='process_rss.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -50,15 +49,17 @@ async def post_to_ifttt(entry):
 
 async def process_entries(entries):
     try:
-        for entry in entries:
+        for i, entry in enumerate(entries):
             if entry['description'] == "No Content":
                 logging.info(f"Skipping entry with 'No Content': {entry['title']}")
                 continue
 
             logging.info(f"Processing entry: {entry['title']}")
             await post_to_ifttt(entry)
-            logging.info(f"Sleeping for {post_delay} seconds before processing the next entry...")
-            await asyncio.sleep(post_delay)
+
+            if i < len(entries) - 1:
+                logging.info(f"Sleeping for {post_delay} seconds before processing the next entry...")
+                await asyncio.sleep(post_delay)
     except Exception as e:
         logging.error(f"Error processing entries: {e}")
 

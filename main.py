@@ -37,31 +37,35 @@ async def main():
 
     fetcher = Fetcher(config)
     
-    logger.info("Fetching latest posts...")
-    try:
-        all_latest_posts = []
-        for section, sources in config['sections'].items():
-            logger.info(f"Fetching posts for section: {section}")
-            latest_posts = fetcher.fetch_latest(sources)
-            for post in latest_posts:
-                post['section'] = section
-            all_latest_posts.extend(latest_posts)
-        
-        if all_latest_posts:
-            logger.info(f"Latest posts fetched: {all_latest_posts}")
-        else:
-            logger.warning("No latest posts fetched.")
-        
-        rss_generator = RSSGenerator(all_latest_posts)
-        rss_file_path = 'feed.xml'
-        rss_generator.save_rss(filename=rss_file_path)
-        logger.info(f"RSS feed updated at {rss_file_path}.")
-        
-        # Ejecutar el script process_rss.py de manera asíncrona y continuar
-        await run_process_rss()
+    while True:
+        logger.info("Fetching latest posts...")
+        try:
+            all_latest_posts = []
+            for section, sources in config['sections'].items():
+                logger.info(f"Fetching posts for section: {section}")
+                latest_posts = fetcher.fetch_latest(sources)
+                for post in latest_posts:
+                    post['section'] = section
+                all_latest_posts.extend(latest_posts)
+            
+            if all_latest_posts:
+                logger.info(f"Latest posts fetched: {all_latest_posts}")
+            else:
+                logger.warning("No latest posts fetched.")
+            
+            rss_generator = RSSGenerator(all_latest_posts)
+            rss_file_path = 'feed.xml'
+            rss_generator.save_rss(filename=rss_file_path)
+            logger.info(f"RSS feed updated at {rss_file_path}.")
+            
+            # Ejecutar el script process_rss.py de manera asíncrona y continuar
+            await run_process_rss()
 
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
+        except Exception as e:
+            logger.error(f"An error occurred: {e}")
+
+        logger.info(f"Sleeping for {config['interval']} seconds before next iteration...")
+        await asyncio.sleep(config['interval'])
 
 if __name__ == '__main__':
     try:
