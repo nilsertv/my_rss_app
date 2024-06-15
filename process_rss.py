@@ -4,6 +4,7 @@ import json
 import logging
 import asyncio
 import aiohttp
+import time
 
 # Configurar el logger
 logging.basicConfig(filename='process_rss.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -13,9 +14,10 @@ with open('config.json', 'r') as config_file:
     config = json.load(config_file)
 
 ifttt_webhook_url = config['ifttt_webhook_url']
-delay_seconds = config.get('delay_seconds', 225)  # Valor predeterminado de 225 segundos
+post_delay = config.get('post_delay', 225)  # Obtiene el valor de post_delay, por defecto 225 segundos
 
 async def read_rss(filename):
+    logging.info("Reading RSS feed...")
     tree = ET.parse(filename)
     root = tree.getroot()
     entries = []
@@ -55,8 +57,8 @@ async def process_entries(entries):
 
             logging.info(f"Processing entry: {entry['title']}")
             await post_to_ifttt(entry)
-            logging.info(f"Waiting for {delay_seconds} seconds before processing the next entry...")
-            await asyncio.sleep(delay_seconds)
+            logging.info(f"Sleeping for {post_delay} seconds before processing the next entry...")
+            await asyncio.sleep(post_delay)
     except Exception as e:
         logging.error(f"Error processing entries: {e}")
 
@@ -67,4 +69,7 @@ async def main():
     logging.info("Finished processing RSS entries.")
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        logging.error(f"An error occurred during execution: {e}")
