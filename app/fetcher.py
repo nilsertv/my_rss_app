@@ -31,11 +31,9 @@ class Fetcher:
         latest_posts = []
         for source in sources:
             if source['type'] == 'web':
-                latest_post = self.fetch_html_page(source['url'])
+                latest_post = self.fetch_web(source['url'])
             elif source['type'] == 'youtube':
                 latest_post = self.fetch_youtube(source['url'])
-            elif source['type'] == 'rss':
-                latest_post = self.fetch_rss_feed(source['url'])
 
             if latest_post and not self.is_post_in_history(latest_post):
                 latest_posts.append(latest_post)
@@ -54,6 +52,12 @@ class Fetcher:
                     self.logger.info(f"Post already in history: {post['url']}")
                     return True
         return False
+
+    def fetch_web(self, url):
+        if 'rss' in url or 'feed' in url:
+            return self.fetch_rss_feed(url)
+        else:
+            return self.fetch_html_page(url)
 
     def fetch_html_page(self, url):
         self.logger.info(f"Fetching HTML content from {url}")
