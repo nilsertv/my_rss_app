@@ -29,11 +29,13 @@ class Fetcher:
 
     def fetch_latest(self, sources):
         latest_posts = []
-        for source in sources:
-            if source['type'] == 'web':
-                latest_post = self.fetch_web(source['url'])
-            elif source['type'] == 'youtube':
-                latest_post = self.fetch_youtube(source['url'])
+        for site in sources:
+            if site['type'] == 'rss':
+                latest_post = self.fetch_rss_feed(site['url'])
+            elif site['type'] == 'web':
+                latest_post = self.fetch_html_page(site['url'])
+            elif site['type'] == 'youtube':
+                latest_post = self.fetch_youtube(site['url'])
 
             if latest_post and not self.is_post_in_history(latest_post):
                 latest_posts.append(latest_post)
@@ -53,17 +55,11 @@ class Fetcher:
                     return True
         return False
 
-    def fetch_web(self, url):
-        if 'rss' in url or 'feed' in url:
-            return self.fetch_rss_feed(url)
-        else:
-            return self.fetch_html_page(url)
-
     def fetch_html_page(self, url):
         self.logger.info(f"Fetching HTML content from {url}")
         response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
+        soup = BeautifulSoup(response.text, 'lxml')
+
         article = soup.find('div', class_='latest-news')
         if article:
             title_tag = article.find('h1') or article.find('h2') or article.find('h3')
@@ -78,16 +74,14 @@ class Fetcher:
 
     def fetch_rss_feed(self, url):
         self.logger.info(f"Fetching RSS feed from {url}")
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'xml')  # Utilizamos features="xml" aquí
-        entries = soup.find_all('entry') or soup.find_all('item')
-        if not entries:
+        feed = feedparser.parse(url)
+        if not feed.entries:
             self.logger.error(f"No entries found in RSS feed: {url}")
             return {"url": url, "title": "No Entries Found", "content": ""}
-        latest_entry = entries[0]
-        title = latest_entry.title.get_text(strip=True)
-        link = latest_entry.link.get('href') if latest_entry.link else latest_entry.find('link').get('href')
-        content = latest_entry.summary.get_text(strip=True) if latest_entry.find('summary') else latest_entry.description.get_text(strip=True)
+        latest_entry = feed.entries[0]
+        title = latest_entry.title
+        link = latest_entry.link
+        content = latest_entry.summary if 'summary' in latest_entry else latest_entry.description
         self.logger.info(f"Fetched RSS feed content: {title}")
         return {"url": link, "title": title, "content": content}
 
