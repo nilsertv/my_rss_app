@@ -1,4 +1,4 @@
-interval: 3600  # Intervalo en segundos
+interval: 600  # Intervalo en segundos
 log_file: "app.log"
 history_file: "history.json"
 sections:
@@ -11,6 +11,8 @@ sections:
       type: "youtube"
     - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCP0AJJeNkFBYzegTTVbKhPg"
       type: "youtube"
+    - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCIpXj6C68YhT8Px3DGCafYA"
+      type: "youtube"
   Noticias:
     - url: "https://www.idl-reporteros.pe/feed/"
       type: "rss"
@@ -21,8 +23,6 @@ sections:
     - url: "https://laencerrona.pe/articulos/feed/"
       type: "rss"
     - url: "https://elcomercio.pe/"
-      type: "web"
-    - url: "https://larepublica.pe/rss.xml"
       type: "web"
     - url: "https://elbuho.pe/seccion/noticias/nacional/feed/"
       type: "rss"
