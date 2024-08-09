@@ -5,9 +5,9 @@ import logging
 import time
 import threading
 import requests
-from fetcher import Fetcher
-from rss_generator import RSSGenerator
-from logger import setup_logger
+from app.fetcher import Fetcher
+from app.rss_generator import RSSGenerator
+from app.logger import setup_logger
 
 app = Flask(__name__)
 
