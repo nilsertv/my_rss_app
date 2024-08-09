@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_file
 import yaml
 import subprocess
 import logging
@@ -8,6 +8,7 @@ import requests
 from app.fetcher import Fetcher
 from app.rss_generator import RSSGenerator
 from app.logger import setup_logger
+import os
 
 app = Flask(__name__)
 
@@ -91,6 +92,14 @@ def run_rss_process_background():
 def run_rss_process():
     run_rss_process_background()
     return jsonify({"message": "RSS processing is running in the background."}), 200
+
+@app.route('/feed', methods=['GET'])
+def get_feed():
+    feed_path = os.path.join(os.getcwd(), 'feed.xml')
+    if os.path.exists(feed_path):
+        return send_file(feed_path, mimetype='application/rss+xml')
+    else:
+        return jsonify({"error": "feed.xml not found"}), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=7000)
