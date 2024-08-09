@@ -1,5 +1,6 @@
 interval: 600  # Intervalo en segundos
 log_file: "app.log"
+ifttt_webhook_url: "https://maker.ifttt.com/trigger/rss_process_completed/with/key/d_4khvEWOx-AjU2Vle6CNO"
 history_file: "history.json"
 sections:
   Youtube:
@@ -33,7 +34,7 @@ sections:
       type: "rss"
     - url: "https://www.bbc.com/mundo"
       type: "web"
-  Tech:
+  CienciayTech:
     - url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/tecnologia/portada"
       type: "rss"
     - url: "https://www.perfil.com/feed/tecnologia"
@@ -41,6 +42,8 @@ sections:
     - url: "https://www.muyinteresante.com/rss/tecnologia.xml"
       type: "rss"
     - url: "http://rss.dw.com/rdf/rss-sp-cyt"
+      type: "rss"
+    - url: "https://hipertextual.com/tecnologia/feed"
       type: "rss"
   Curiosidades:
     - url: "https://www.muyinteresante.com/rss/curiosidades.xml"
@@ -50,4 +53,7 @@ sections:
       type: "rss"
   Salud:
     - url: "https://www.muyinteresante.com/rss/salud.xml"
+      type: "rss"
+  CineyTV:
+    - url: "https://hipertextual.com/cine-television/feed"
       type: "rss"
