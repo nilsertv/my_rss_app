@@ -2,6 +2,8 @@ interval: 600  # Intervalo en segundos
 log_file: "app.log"
 ifttt_webhook_url: "https://maker.ifttt.com/trigger/rss_process_completed/with/key/REDACTED_IFTTT_KEY"
 history_file: "history.json"
+database:
+  connection_url: "postgresql://user:password@localhost:5432/rss_app_db"
 sections:
   Youtube:
     - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC5j8-2FT0ZMMBkmK72R4aeA"

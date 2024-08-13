@@ -1,59 +1,85 @@
+import hashlib
 import requests
 import feedparser
-import json
-from datetime import datetime
 import logging
 from bs4 import BeautifulSoup
+import psycopg2
+from psycopg2 import sql, extras
+from datetime import datetime
 
 class Fetcher:
     def __init__(self, config):
         self.logger = logging.getLogger('RSSLogger')
         self.sections = config['sections']
-        self.history_file = config['history_file']
-        self.history = self.load_history()
+        self.connection_url = config['database']['connection_url']
+        self.batch_size = 1000  # Tamaño del lote para las inserciones
+        self.init_db()
 
-    def load_history(self):
-        try:
-            with open(self.history_file, 'r') as file:
-                history = json.load(file)
-                self.logger.info(f"Loaded history from {self.history_file}")
-                return history
-        except FileNotFoundError:
-            self.logger.warning(f"History file {self.history_file} not found. Starting with an empty history.")
-            return []
+    def init_db(self):
+        with psycopg2.connect(self.connection_url) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS rss_history (
+                        id SERIAL PRIMARY KEY,
+                        url TEXT UNIQUE NOT NULL,
+                        url_hash TEXT UNIQUE NOT NULL,
+                        title TEXT,
+                        content TEXT,
+                        timestamp TIMESTAMPTZ DEFAULT NOW()
+                    )
+                ''')
+                conn.commit()
 
-    def save_history(self):
-        with open(self.history_file, 'w') as file:
-            json.dump(self.history, file)
-        self.logger.info(f"Saved history to {self.history_file}")
+    def generate_url_hash(self, url):
+        # Generar un hash único basado en la URL
+        return hashlib.sha256(url.encode('utf-8')).hexdigest()
 
-    def fetch_latest(self, sources):
+    def is_post_in_history(self, url_hash):
+        with psycopg2.connect(self.connection_url) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(1) FROM rss_history WHERE url_hash = %s", (url_hash,))
+                return cursor.fetchone()[0] > 0
+
+    def save_posts_to_history(self, posts):
+        with psycopg2.connect(self.connection_url) as conn:
+            with conn.cursor() as cursor:
+                insert_query = sql.SQL("""
+                    INSERT INTO rss_history (url, url_hash, title, content, timestamp)
+                    VALUES %s
+                    ON CONFLICT (url_hash) DO NOTHING
+                """)
+                extras.execute_values(cursor, insert_query, posts)
+                conn.commit()
+
+    def fetch_latest(self):
         latest_posts = []
-        for site in sources:
-            if site['type'] == 'rss':
-                latest_post = self.fetch_rss_feed(site['url'])
-            elif site['type'] == 'web':
-                latest_post = self.fetch_html_page(site['url'])
-            elif site['type'] == 'youtube':
-                latest_post = self.fetch_youtube(site['url'])
+        for section, sources in self.sections.items():
+            for site in sources:
+                if site['type'] == 'rss':
+                    latest_post = self.fetch_rss_feed(site['url'])
+                elif site['type'] == 'web':
+                    latest_post = self.fetch_html_page(site['url'])
+                elif site['type'] == 'youtube':
+                    latest_post = self.fetch_youtube(site['url'])
 
-            if latest_post and not self.is_post_in_history(latest_post):
-                latest_posts.append(latest_post)
+                if latest_post:
+                    url_hash = self.generate_url_hash(latest_post['url'])
+                    if not self.is_post_in_history(url_hash):
+                        latest_post['url_hash'] = url_hash
+                        latest_post['section'] = section  # Aquí se asigna la sección al post
+                        latest_posts.append(latest_post)
 
-        self.history.append({
-            'timestamp': datetime.now().isoformat(),
-            'posts': latest_posts
-        })
-        self.save_history()
+        # Validar y almacenar en la base de datos
+        if latest_posts:
+            validated_posts = [
+                (post['url'], post['url_hash'], post.get('title', 'No Title'), post.get('content', 'No Content'), datetime.now())
+                for post in latest_posts if post.get('url')
+            ]
+            self.save_posts_to_history(validated_posts)
+
         return latest_posts
 
-    def is_post_in_history(self, post):
-        for entry in self.history:
-            for recorded_post in entry.get('posts', []):
-                if recorded_post['url'] == post['url']:
-                    self.logger.info(f"Post already in history: {post['url']}")
-                    return True
-        return False
+    # Las funciones fetch_html_page, fetch_rss_feed, y fetch_youtube permanecen iguales
 
     def fetch_html_page(self, url):
         self.logger.info(f"Fetching HTML content from {url}")
