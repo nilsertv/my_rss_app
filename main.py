@@ -45,7 +45,7 @@ def run_process_rss():
 
 def process_rss_entries():
     config = load_config()
-    logger = setup_logger(config['log_file'])
+    logger = setup_logger()
 
     logger.info("Starting application...")
 

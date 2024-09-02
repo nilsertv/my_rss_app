@@ -1,0 +1,11 @@
+*.log
+logs/
+__pycache__/
+*.pyc
+*.pyo
+venv/
+tests/
+history.json
+test_history.json
+rss.txt
+read_rss.py

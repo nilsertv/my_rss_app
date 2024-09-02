@@ -6,7 +6,7 @@ import asyncio
 import aiohttp
 
 # Configurar el logger
-logging.basicConfig(filename='process_rss.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Cargar la configuración
 with open('config.json', 'r') as config_file:
