@@ -1,7 +1,6 @@
 interval: 600  # Intervalo en segundos
 log_file: "app.log"
 ifttt_webhook_url: "https://maker.ifttt.com/trigger/rss_process_completed/with/key/d_4khvEWOx-AjU2Vle6CNO"
-history_file: "history.json"
 database:
   connection_url: "postgresql://ntejedov:1Al5yWnyXIKRDCDRz9c51thpN7DVUA3m@dpg-cqtg83bv2p9s73dff6ig-a.oregon-postgres.render.com/rss_app_db"
 sections:

@@ -1,5 +1,3 @@
-*.log
-logs/
 __pycache__/
 *.pyc
 *.pyo
@@ -7,18 +5,12 @@ venv/
 .venv/
 poetry.toml
 tests/
-history.json
-test_history.json
-rss.txt
-read_rss.py
-test_server.py
 .env
 .env.example
 *.md
-CHANGES.md
-DEPLOY.md
-start-local.ps1
 .git
 .gitignore
 .vscode
 .idea
+legacy/
+.github

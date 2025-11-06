@@ -5,4 +5,4 @@
 $env:PYTHONIOENCODING = "utf-8"
 
 # Ejecutar main.py
-poetry run python main.py
+poetry run python src/main.py

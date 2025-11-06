@@ -6,9 +6,9 @@ import os
 import signal
 import sys
 from pathlib import Path
-from app.fetcher import Fetcher
-from app.rss_generator import RSSGenerator
-from app.logger import setup_logger
+from src.core.fetcher import Fetcher
+from src.core.rss_generator import RSSGenerator
+from src.utils.logger import setup_logger
 
 # Directorio de datos persistente
 DATA_DIR_STR = os.getenv('FEED_DIR', './data')
@@ -36,7 +36,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def load_config():
-    with open('app/config.yaml', 'r', encoding='utf-8') as file:
+    with open('src/config.yaml', 'r', encoding='utf-8') as file:
         return yaml.safe_load(file)
 
 def run_process_rss():
@@ -46,7 +46,7 @@ def run_process_rss():
 
     try:
         current_process = subprocess.Popen(
-            ["poetry", "run", "python", "process_rss.py"],
+            ["poetry", "run", "python", "src/process_rss.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )

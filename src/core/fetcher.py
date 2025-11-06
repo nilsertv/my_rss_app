@@ -9,7 +9,7 @@ from datetime import datetime
 
 class Fetcher:
     def __init__(self, config):
-        from app.logger import setup_logger
+        from src.utils.logger import setup_logger
         self.logger = setup_logger(name='FetcherLogger', log_file='fetcher.log')
         self.sections = config['sections']
         self.connection_url = config['database']['connection_url']
@@ -27,6 +27,7 @@ class Fetcher:
                         title TEXT,
                         content TEXT,
                         section TEXT,
+                        image_url TEXT,
                         sent_to_ifttt BOOLEAN DEFAULT FALSE,
                         timestamp TIMESTAMPTZ DEFAULT NOW()
                     )
@@ -63,7 +64,7 @@ class Fetcher:
         with psycopg2.connect(self.connection_url) as conn:
             with conn.cursor() as cursor:
                 insert_query = sql.SQL("""
-                    INSERT INTO rss_history (url, url_hash, title, content, section, timestamp)
+                    INSERT INTO rss_history (url, url_hash, title, content, section, image_url, timestamp)
                     VALUES %s
                     ON CONFLICT (url_hash) DO NOTHING
                 """)
@@ -82,7 +83,7 @@ class Fetcher:
                 if exclude_sections:
                     placeholders = ', '.join(['%s'] * len(exclude_sections))
                     query = f"""
-                        SELECT url, title, content, section, timestamp
+                        SELECT url, title, content, section, image_url, timestamp
                         FROM rss_history
                         WHERE section NOT IN ({placeholders})
                         ORDER BY timestamp DESC
@@ -91,7 +92,7 @@ class Fetcher:
                     cursor.execute(query, (*exclude_sections, limit))
                 else:
                     cursor.execute("""
-                        SELECT url, title, content, section, timestamp
+                        SELECT url, title, content, section, image_url, timestamp
                         FROM rss_history
                         ORDER BY timestamp DESC
                         LIMIT %s
@@ -105,7 +106,8 @@ class Fetcher:
                         'title': row[1],
                         'content': row[2],
                         'section': row[3],
-                        'timestamp': row[4]
+                        'image_url': row[4],
+                        'timestamp': row[5]
                     })
                 return posts
 
@@ -118,7 +120,7 @@ class Fetcher:
         with psycopg2.connect(self.connection_url) as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT url, title, content, section, timestamp
+                    SELECT url, title, content, section, image_url, timestamp
                     FROM rss_history
                     WHERE sent_to_ifttt = FALSE
                     ORDER BY timestamp DESC
@@ -133,7 +135,8 @@ class Fetcher:
                         'title': row[1],
                         'content': row[2],
                         'section': row[3],
-                        'timestamp': row[4]
+                        'image_url': row[4],
+                        'timestamp': row[5]
                     })
                 return posts
 
@@ -180,7 +183,7 @@ class Fetcher:
         # Validar y almacenar en la base de datos
         if latest_posts:
             validated_posts = [
-                (post['url'], post['url_hash'], post.get('title', 'No Title'), post.get('content', 'No Content'), post.get('section', 'Unknown'), datetime.now())
+                (post['url'], post['url_hash'], post.get('title', 'No Title'), post.get('content', 'No Content'), post.get('section', 'Unknown'), post.get('image_url'), datetime.now())
                 for post in latest_posts if post.get('url')
             ]
             self.save_posts_to_history(validated_posts)
@@ -191,40 +194,101 @@ class Fetcher:
 
     def fetch_html_page(self, url):
         self.logger.info(f"Fetching HTML content from {url}")
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'lxml')
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'lxml')
 
-        article = soup.find('div', class_='latest-news')
-        if article:
-            title_tag = article.find('h1') or article.find('h2') or article.find('h3')
-            title = title_tag.get_text(strip=True) if title_tag else "No Title"
-            content = article.get_text(strip=True)
-            link_tag = article.find('a', href=True)
-            link = link_tag['href'] if link_tag else url
-            self.logger.info(f"Fetched HTML content from {url}")
-            return {"url": link, "title": title, "content": content}
-        self.logger.error(f"No valid article found at {url}")
-        return {"url": url, "title": "No Title", "content": "No Content"}
+            article = soup.find('div', class_='latest-news')
+            if article:
+                title_tag = article.find('h1') or article.find('h2') or article.find('h3')
+                title = title_tag.get_text(strip=True) if title_tag else "No Title"
+                content = article.get_text(strip=True)
+                link_tag = article.find('a', href=True)
+                link = link_tag['href'] if link_tag else url
+                
+                # Intentar extraer imagen
+                image_url = self._extract_image_from_html(article, url)
+                
+                self.logger.info(f"Fetched HTML content from {url}")
+                return {"url": link, "title": title, "content": content, "image_url": image_url}
+            self.logger.error(f"No valid article found at {url}")
+            return {"url": url, "title": "No Title", "content": "No Content", "image_url": None}
+        except Exception as e:
+            self.logger.error(f"Error fetching HTML from {url}: {e}")
+            return {"url": url, "title": "No Title", "content": "No Content", "image_url": None}
+
+    def _extract_image_from_html(self, element, base_url):
+        """Extrae URL de imagen de un elemento HTML"""
+        try:
+            # Buscar meta og:image
+            img_tag = element.find('img')
+            if img_tag and img_tag.get('src'):
+                return img_tag['src']
+            return None
+        except Exception:
+            return None
+
+    def _extract_image_from_rss(self, entry):
+        """Extrae URL de imagen de una entrada RSS"""
+        try:
+            # Buscar media:content
+            if hasattr(entry, 'media_content') and entry.media_content:
+                return entry.media_content[0].get('url')
+            
+            # Buscar media:thumbnail
+            if hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
+                return entry.media_thumbnail[0].get('url')
+            
+            # Buscar enclosure de imagen
+            if hasattr(entry, 'enclosures'):
+                for enclosure in entry.enclosures:
+                    if 'image' in enclosure.get('type', ''):
+                        return enclosure.get('href')
+            
+            return None
+        except Exception:
+            return None
 
     def fetch_rss_feed(self, url):
         self.logger.info(f"Fetching RSS feed from {url}")
-        feed = feedparser.parse(url)
-        if not feed.entries:
-            self.logger.error(f"No entries found in RSS feed: {url}")
-            return {"url": url, "title": "No Entries Found", "content": ""}
-        latest_entry = feed.entries[0]
-        title = latest_entry.title
-        link = latest_entry.link
-        content = latest_entry.summary if 'summary' in latest_entry else latest_entry.description
-        self.logger.info(f"Fetched RSS feed content: {title}")
-        return {"url": link, "title": title, "content": content}
+        try:
+            feed = feedparser.parse(url)
+            if not feed.entries:
+                self.logger.error(f"No entries found in RSS feed: {url}")
+                return {"url": url, "title": "No Entries Found", "content": "", "image_url": None}
+            
+            latest_entry = feed.entries[0]
+            title = latest_entry.get('title', 'No Title')
+            link = latest_entry.get('link', url)
+            content = latest_entry.get('summary', latest_entry.get('description', 'No Content'))
+            
+            # Extraer imagen
+            image_url = self._extract_image_from_rss(latest_entry)
+            
+            self.logger.info(f"Fetched RSS feed content: {title}")
+            return {"url": link, "title": title, "content": content, "image_url": image_url}
+        except Exception as e:
+            self.logger.error(f"Error fetching RSS feed from {url}: {e}")
+            return {"url": url, "title": "No Entries Found", "content": "", "image_url": None}
 
     def fetch_youtube(self, feed_url):
         self.logger.info(f"Fetching YouTube content from {feed_url}")
-        feed = feedparser.parse(feed_url)
-        if not feed.entries:
-            self.logger.error(f"No entries found for YouTube channel: {feed_url}")
-            return {"url": feed_url, "title": "No Videos Found", "content": ""}
-        latest_video = feed.entries[0]
-        self.logger.info(f"Fetched YouTube content: {latest_video.title}")
-        return {"url": latest_video.link, "title": latest_video.title, "content": latest_video.summary}
+        try:
+            feed = feedparser.parse(feed_url)
+            if not feed.entries:
+                self.logger.error(f"No entries found for YouTube channel: {feed_url}")
+                return {"url": feed_url, "title": "No Videos Found", "content": "", "image_url": None}
+            
+            latest_video = feed.entries[0]
+            title = latest_video.get('title', 'No Title')
+            link = latest_video.get('link', feed_url)
+            content = latest_video.get('summary', 'No Content')
+            
+            # YouTube proporciona thumbnail en media:thumbnail
+            image_url = self._extract_image_from_rss(latest_video)
+            
+            self.logger.info(f"Fetched YouTube content: {title}")
+            return {"url": link, "title": title, "content": content, "image_url": image_url}
+        except Exception as e:
+            self.logger.error(f"Error fetching YouTube from {feed_url}: {e}")
+            return {"url": feed_url, "title": "No Videos Found", "content": "", "image_url": None}

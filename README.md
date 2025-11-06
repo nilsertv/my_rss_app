@@ -56,28 +56,43 @@ Aplicación automatizada para agregar, procesar y distribuir contenido de múlti
 
 ```
 my-rss-app/
-├── app/
-│   ├── config.yaml          # Configuración de fuentes y parámetros
-│   ├── fetcher.py           # Lógica de obtención de contenido
-│   ├── rss_generator.py     # Generación del feed RSS
-│   └── logger.py            # Configuración de logging
+├── src/                     # Código fuente principal
+│   ├── core/                # Módulos core
+│   │   ├── fetcher.py       # Lógica de obtención de contenido
+│   │   └── rss_generator.py # Generación del feed RSS
+│   ├── utils/               # Utilidades
+│   │   └── logger.py        # Configuración de logging
+│   ├── main.py              # Script principal (loop de ejecución)
+│   ├── webserver.py         # Servidor Flask para servir feed.xml
+│   ├── process_rss.py       # Procesador y distribuidor IFTTT
+│   └── config.yaml          # Configuración de fuentes RSS
+├── legacy/                  # Archivos legacy (no en uso)
+│   ├── history.json         # Historial JSON (supersedido por PostgreSQL)
+│   ├── import_data.py       # Script de migración (ya ejecutado)
+│   ├── read_rss.py          # Utilidad de debug
+│   ├── Procfile             # Heroku config (proyecto usa Fly.io)
+│   ├── requirements.txt     # pip requirements (proyecto usa Poetry)
+│   └── README.md            # Documentación de archivos legacy
 ├── tests/
 │   └── test_fetcher.py      # Tests unitarios
-├── main.py                  # Script principal (loop de ejecución)
-├── webserver.py             # Servidor Flask para servir feed.xml
-├── start.sh                 # Script de inicio para múltiples procesos
-├── process_rss.py           # Procesador y distribuidor IFTTT
-├── read_rss.py              # Utilidad para leer feed RSS
-├── import_data.py           # Script de migración de datos
+├── data/                    # Datos persistentes
+│   ├── feed.xml             # Feed RSS generado
+│   └── feed_new.xml         # Feed con posts nuevos (para IFTTT)
+├── logs/                    # Archivos de logging
 ├── config.json              # Configuración de webhooks IFTTT
-├── requirements.txt         # Dependencias Python
+├── pyproject.toml           # Dependencias Poetry
+├── poetry.lock              # Lock file Poetry
 ├── Dockerfile               # Imagen Docker
 ├── .dockerignore            # Archivos excluidos del build
-├── fly.toml                 # Configuración Fly.io con volumen
-├── Procfile                 # Configuración Heroku
-├── DEPLOY.md                # Guía de despliegue en Fly.io
-├── feed.xml                 # Feed RSS generado (salida)
-└── history.json             # Historial local (legacy)
+├── fly.toml                 # Configuración Fly.io
+├── start.sh                 # Entrypoint para producción
+├── start-local.ps1          # Desarrollo local Windows
+├── run-local.ps1            # Ejecutar worker solo
+├── DEPLOY.md                # Guía de despliegue Fly.io
+├── ARCHITECTURE.md          # Arquitectura detallada
+├── QUICKSTART.md            # Guía rápida de inicio
+├── STRUCTURE.md             # Documentación de estructura
+└── README.md                # Este archivo
 ```
 
 ## 🚀 Instalación y Uso

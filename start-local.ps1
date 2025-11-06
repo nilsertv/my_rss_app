@@ -30,11 +30,11 @@ Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action $cleanup | Out
 
 try {
     # Iniciar el servidor web en background
-    Write-Host "Iniciando servidor web en http://localhost:8080..." -ForegroundColor Cyan
+    Write-Host "Iniciando servidor web..." -ForegroundColor Cyan
     $webserver = Start-Job -ScriptBlock {
         $env:FEED_DIR = "./data"
         $env:PORT = "8080"
-        python webserver.py
+        python src/webserver.py
     }
 
     # Esperar un momento para que el servidor inicie
@@ -52,7 +52,7 @@ try {
         Write-Host "Iniciando worker RSS..." -ForegroundColor Cyan
         $worker = Start-Job -ScriptBlock {
             $env:FEED_DIR = "./data"
-            python main.py
+            python src/main.py
         }
         Write-Host "Worker RSS iniciado (Job ID: $($worker.Id))" -ForegroundColor Green
         Write-Host ""

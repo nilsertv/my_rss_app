@@ -10,7 +10,7 @@ chmod 777 /data
 
 # Iniciar el servidor web en background
 echo "Starting web server..."
-python webserver.py &
+python src/webserver.py &
 WEBSERVER_PID=$!
 
 # Esperar un momento para que el servidor inicie
@@ -18,7 +18,7 @@ sleep 3
 
 # Iniciar el worker principal
 echo "Starting RSS worker..."
-python main.py &
+python src/main.py &
 WORKER_PID=$!
 
 # Función para manejar señales de terminación
