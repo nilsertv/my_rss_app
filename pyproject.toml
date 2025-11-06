@@ -19,6 +19,7 @@ psycopg2-binary = "^2.9.9"
 python-dotenv = "^1.0.1"
 PyYAML = "^6.0.1"
 requests = "^2.32.3"
+mistralai = "^1.9.11"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
