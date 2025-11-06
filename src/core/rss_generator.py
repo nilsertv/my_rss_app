@@ -40,6 +40,12 @@ class RSSGenerator:
             item_description = SubElement(item, 'description')
             item_description.text = post.get('content', 'No Content')
             
+            # Agregar imagen si disponible
+            image_url = post.get('image_url')
+            if image_url:
+                item_image = SubElement(item, 'image')
+                item_image.text = image_url
+            
             # Agregar GUID (identificador único)
             item_guid = SubElement(item, 'guid')
             item_guid.set('isPermaLink', 'true')
