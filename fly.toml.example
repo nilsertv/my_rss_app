@@ -1,0 +1,52 @@
+# fly.toml - Ejemplo de configuración avanzada
+# Copia este archivo como fly.toml y ajusta según tus necesidades
+
+app = 'my-rss-app'
+primary_region = 'scl'  # Santiago, Chile - cambia según tu ubicación
+
+[build]
+  # Usa Dockerfile para el build
+  
+[env]
+  FEED_DIR = "/data"
+  PORT = "8080"
+
+[processes]
+  app = 'sh start.sh'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = true
+  min_machines_running = 1
+  processes = ['app']
+  
+  # Health checks para monitoreo
+  [http_service.checks]
+    [http_service.checks.health]
+      interval = "30s"
+      timeout = "10s"
+      grace_period = "30s"
+      method = "GET"
+      path = "/health"
+
+[[vm]]
+  size = 'shared-cpu-1x'  # Máquina más pequeña
+  memory = '256mb'        # Memoria mínima
+
+# Volumen persistente para el feed RSS
+[mounts]
+  source = "rss_feed_data"
+  destination = "/data"
+
+# Regiones adicionales (opcional)
+# Descomenta y ajusta si quieres múltiples regiones
+# [[vm]]
+#   size = 'shared-cpu-1x'
+#   region = 'gru'  # São Paulo, Brazil
+
+# Configuración de recursos (opcional)
+# [metrics]
+#   port = 9091
+#   path = "/metrics"

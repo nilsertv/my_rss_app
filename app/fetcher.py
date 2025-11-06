@@ -9,7 +9,8 @@ from datetime import datetime
 
 class Fetcher:
     def __init__(self, config):
-        self.logger = logging.getLogger('RSSLogger')
+        from app.logger import setup_logger
+        self.logger = setup_logger(name='FetcherLogger', log_file='fetcher.log')
         self.sections = config['sections']
         self.connection_url = config['database']['connection_url']
         self.batch_size = 1000  # Tamaño del lote para las inserciones
@@ -25,9 +26,26 @@ class Fetcher:
                         url_hash TEXT UNIQUE NOT NULL,
                         title TEXT,
                         content TEXT,
+                        section TEXT,
+                        sent_to_ifttt BOOLEAN DEFAULT FALSE,
                         timestamp TIMESTAMPTZ DEFAULT NOW()
                     )
                 ''')
+                
+                # Crear índices para optimizar consultas
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_rss_history_timestamp_desc 
+                    ON rss_history (timestamp DESC)
+                ''')
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_rss_history_section_timestamp 
+                    ON rss_history (section, timestamp DESC)
+                ''')
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_rss_history_sent_to_ifttt 
+                    ON rss_history (sent_to_ifttt, timestamp DESC)
+                ''')
+                
                 conn.commit()
 
     def generate_url_hash(self, url):
@@ -38,23 +56,113 @@ class Fetcher:
         with psycopg2.connect(self.connection_url) as conn:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT COUNT(1) FROM rss_history WHERE url_hash = %s", (url_hash,))
-                return cursor.fetchone()[0] > 0
+                result = cursor.fetchone()
+                return result[0] > 0 if result else False
 
     def save_posts_to_history(self, posts):
         with psycopg2.connect(self.connection_url) as conn:
             with conn.cursor() as cursor:
                 insert_query = sql.SQL("""
-                    INSERT INTO rss_history (url, url_hash, title, content, timestamp)
+                    INSERT INTO rss_history (url, url_hash, title, content, section, timestamp)
                     VALUES %s
                     ON CONFLICT (url_hash) DO NOTHING
                 """)
                 extras.execute_values(cursor, insert_query, posts)
                 conn.commit()
 
+    def get_recent_posts(self, limit=20, exclude_sections=None):
+        """Obtiene los últimos N posts de la base de datos para el feed RSS
+        
+        Args:
+            limit: Número máximo de posts a retornar
+            exclude_sections: Lista de secciones a excluir (ej: ['Youtube'])
+        """
+        with psycopg2.connect(self.connection_url) as conn:
+            with conn.cursor() as cursor:
+                if exclude_sections:
+                    placeholders = ', '.join(['%s'] * len(exclude_sections))
+                    query = f"""
+                        SELECT url, title, content, section, timestamp
+                        FROM rss_history
+                        WHERE section NOT IN ({placeholders})
+                        ORDER BY timestamp DESC
+                        LIMIT %s
+                    """
+                    cursor.execute(query, (*exclude_sections, limit))
+                else:
+                    cursor.execute("""
+                        SELECT url, title, content, section, timestamp
+                        FROM rss_history
+                        ORDER BY timestamp DESC
+                        LIMIT %s
+                    """, (limit,))
+                rows = cursor.fetchall()
+                
+                posts = []
+                for row in rows:
+                    posts.append({
+                        'url': row[0],
+                        'title': row[1],
+                        'content': row[2],
+                        'section': row[3],
+                        'timestamp': row[4]
+                    })
+                return posts
+
+    def get_unsent_posts(self, limit=50):
+        """Obtiene posts que aún no han sido enviados a IFTTT
+        
+        Args:
+            limit: Número máximo de posts a retornar
+        """
+        with psycopg2.connect(self.connection_url) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT url, title, content, section, timestamp
+                    FROM rss_history
+                    WHERE sent_to_ifttt = FALSE
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                """, (limit,))
+                rows = cursor.fetchall()
+                
+                posts = []
+                for row in rows:
+                    posts.append({
+                        'url': row[0],
+                        'title': row[1],
+                        'content': row[2],
+                        'section': row[3],
+                        'timestamp': row[4]
+                    })
+                return posts
+
+    def mark_posts_as_sent(self, urls):
+        """Marca posts como enviados a IFTTT
+        
+        Args:
+            urls: Lista de URLs de posts que fueron enviados exitosamente
+        """
+        if not urls:
+            return
+            
+        with psycopg2.connect(self.connection_url) as conn:
+            with conn.cursor() as cursor:
+                placeholders = ', '.join(['%s'] * len(urls))
+                query = f"""
+                    UPDATE rss_history 
+                    SET sent_to_ifttt = TRUE 
+                    WHERE url IN ({placeholders})
+                """
+                cursor.execute(query, urls)
+                conn.commit()
+                self.logger.info(f"Marked {cursor.rowcount} posts as sent to IFTTT")
+
     def fetch_latest(self):
         latest_posts = []
         for section, sources in self.sections.items():
             for site in sources:
+                latest_post = None
                 if site['type'] == 'rss':
                     latest_post = self.fetch_rss_feed(site['url'])
                 elif site['type'] == 'web':
@@ -72,7 +180,7 @@ class Fetcher:
         # Validar y almacenar en la base de datos
         if latest_posts:
             validated_posts = [
-                (post['url'], post['url_hash'], post.get('title', 'No Title'), post.get('content', 'No Content'), datetime.now())
+                (post['url'], post['url_hash'], post.get('title', 'No Title'), post.get('content', 'No Content'), post.get('section', 'Unknown'), datetime.now())
                 for post in latest_posts if post.get('url')
             ]
             self.save_posts_to_history(validated_posts)

@@ -39,7 +39,7 @@ if __name__ == '__main__':
     }
 
     # Ruta al archivo JSON
-    file_path = '.\history.json'
+    file_path = './history.json'
 
     # Cargar los datos del archivo JSON
     data = load_json(file_path)
