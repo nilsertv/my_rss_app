@@ -10,7 +10,7 @@ client = Mistral(api_key)
 inputs: list[dict[str, Any]] = [
   {
     "role": "user",
-    "content": "https://hipertextual.com/cine-television/primer-trailer-biopic-de-michael-jackson/",
+    "content": "https://elpais.com/internacional/2025-11-07/el-cierre-del-gobierno-de-ee-uu-lastra-desde-el-viernes-el-trafico-de-los-principales-aeropuertos-del-pais.html",
   }
 ]
 
