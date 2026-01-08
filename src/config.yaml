@@ -5,8 +5,6 @@ database:
   connection_url: "postgresql://ntejedov:1Al5yWnyXIKRDCDRz9c51thpN7DVUA3m@dpg-cqtg83bv2p9s73dff6ig-a.oregon-postgres.render.com/rss_app_db"
 sections:
   Youtube:
-    - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC5j8-2FT0ZMMBkmK72R4aeA"
-      type: "youtube"
     - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCJOdW-8tYGjzJj2t77rBmXA"
       type: "youtube"
     - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC3_PG15cjuBIKzkEsUznQKQ"
@@ -28,6 +26,10 @@ sections:
       type: "web"
     - url: "https://elbuho.pe/seccion/noticias/nacional/feed/"
       type: "rss"
+    - url: "https://elcomercio.pe/arc/outboundfeeds/rss/category/politica/?outputType=xml"
+      type: "rss"
+    - url: "https://elcomercio.pe/arc/outboundfeeds/rss/category/ultimas-noticias/?outputType=xml"
+      type: "rss"
   Internacionales:
     - url: "https://www.vozdeamerica.com/api/zororegtor"
       type: "rss"
@@ -35,8 +37,12 @@ sections:
       type: "rss"
     - url: "https://www.bbc.com/mundo"
       type: "web"
+    - url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/ultimas-noticias/portada"
+      type: "rss"
   CienciayTech:
     - url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/tecnologia/portada"
+      type: "rss"
+    - url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/ciencia/portada"
       type: "rss"
     - url: "https://www.perfil.com/feed/tecnologia"
       type: "rss"
@@ -55,6 +61,8 @@ sections:
   Salud:
     - url: "https://www.muyinteresante.com/rss/salud.xml"
       type: "rss"
+    - url: "https://saludconlupa.com/noticias/"
+      type: "web"
   CineyTV:
     - url: "https://hipertextual.com/cine-television/feed"
       type: "rss"
