@@ -50,8 +50,6 @@ sections:
       type: "rss"
     - url: "http://rss.dw.com/rdf/rss-sp-cyt"
       type: "rss"
-    - url: "https://hipertextual.com/tecnologia/feed"
-      type: "rss"
   Curiosidades:
     - url: "https://www.muyinteresante.com/rss/curiosidades.xml"
       type: "rss"
@@ -61,8 +59,10 @@ sections:
   Salud:
     - url: "https://www.muyinteresante.com/rss/salud.xml"
       type: "rss"
-    - url: "https://saludconlupa.com/noticias/"
-      type: "web"
-  CineyTV:
-    - url: "https://hipertextual.com/cine-television/feed"
+    - url: "https://medlineplus.gov/spanish/feeds/whatsnew.xml"
       type: "rss"
+    - url: "https://feeds.feedburner.com/temas-y-relatos-blog"
+      type: "rss"
+#  CineyTV:
+#    - url: "https://hipertextual.com/cine-television/feed"
+#      type: "rss"

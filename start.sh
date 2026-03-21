@@ -10,7 +10,7 @@ chmod 777 /data
 
 # Iniciar el servidor web en background
 echo "Starting web server..."
-python src/webserver.py &
+python -m src.webserver &
 WEBSERVER_PID=$!
 
 # Esperar un momento para que el servidor inicie
@@ -18,7 +18,7 @@ sleep 3
 
 # Iniciar el worker principal
 echo "Starting RSS worker..."
-python src/main.py &
+python -m src.main &
 WORKER_PID=$!
 
 # Función para manejar señales de terminación
@@ -37,13 +37,13 @@ while true; do
     # Verificar si los procesos están corriendo
     if ! kill -0 $WEBSERVER_PID 2>/dev/null; then
         echo "Web server died, restarting..."
-        python webserver.py &
+        python -m src.webserver &
         WEBSERVER_PID=$!
     fi
     
     if ! kill -0 $WORKER_PID 2>/dev/null; then
         echo "Worker died, restarting..."
-        python main.py &
+        python -m src.main &
         WORKER_PID=$!
     fi
     

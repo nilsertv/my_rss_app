@@ -36,7 +36,8 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def load_config():
-    with open('src/config.yaml', 'r', encoding='utf-8') as file:
+    config_path = Path(__file__).parent / 'config.yaml'
+    with open(config_path, 'r', encoding='utf-8') as file:
         return yaml.safe_load(file)
 
 def run_process_rss():
@@ -46,7 +47,7 @@ def run_process_rss():
 
     try:
         current_process = subprocess.Popen(
-            ["poetry", "run", "python", "src/process_rss.py"],
+            ["python", "-m", "src.process_rss"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )

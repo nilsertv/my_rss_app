@@ -7,7 +7,7 @@ app = 'my-rss-app'
 primary_region = 'ams'
 
 [build]
-  builder = "paketobuildpacks/builder:base"
+  # Usar Dockerfile en lugar de buildpacks
 
 [env]
   FEED_DIR = "/data"

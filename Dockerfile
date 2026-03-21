@@ -17,6 +17,9 @@ RUN poetry config virtualenvs.create false \
 # Copiar el resto de los archivos de la aplicación
 COPY . .
 
+# Configurar PYTHONPATH para que Python encuentre el paquete src
+ENV PYTHONPATH=/workspace
+
 # Hacer el script de inicio ejecutable
 RUN chmod +x start.sh
 
