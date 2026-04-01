@@ -50,11 +50,11 @@ with open('config.json', 'r') as config_file:
 ifttt_webhook_url = config['ifttt_webhook_url']
 post_delay = config.get('post_delay', 225)  # Obtiene el valor de post_delay, por defecto 225 segundos
 
-# Cargar configuración de base de datos desde src/config.yaml
+# Cargar configuración de base de datos desde src/config.yaml o variable de entorno
 config_path = Path(__file__).parent / 'config.yaml'
 with open(config_path, 'r', encoding='utf-8') as yaml_file:
     app_config = yaml.safe_load(yaml_file)
-    db_connection_url = app_config['database']['connection_url']
+    db_connection_url = os.environ.get('DATABASE_URL') or app_config.get('database', {}).get('connection_url')
 
 async def read_rss(filename):
     logger.info("Reading RSS feed...")

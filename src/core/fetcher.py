@@ -12,7 +12,8 @@ class Fetcher:
         from src.utils.logger import setup_logger
         self.logger = setup_logger(name='FetcherLogger', log_file='fetcher.log')
         self.sections = config['sections']
-        self.connection_url = config['database']['connection_url']
+        import os
+        self.connection_url = os.environ.get('DATABASE_URL') or config.get('database', {}).get('connection_url')
         self.batch_size = 1000  # Tamaño del lote para las inserciones
         self.init_db()
 
