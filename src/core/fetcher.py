@@ -241,6 +241,9 @@ class Fetcher:
                     latest_post = self.fetch_youtube(site_url)
 
                 if latest_post and latest_post.get('url'):
+                    title = latest_post.get('title', '')
+                    if title in ("No Entries Found", "No Videos Found", "No Title"):
+                        continue
                     latest_post['url_hash'] = self.generate_url_hash(latest_post['url'])
                     latest_post['section'] = section
                     candidate_posts.append(latest_post)
