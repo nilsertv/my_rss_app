@@ -20,6 +20,7 @@ FEED_DIR = Path(os.getenv('FEED_DIR', '/data' if os.path.exists('/data') else st
 # Configuración de red y servidor
 PORT = int(os.getenv('PORT', 8080))
 HOST = os.getenv('HOST', '0.0.0.0')
+APP_URL = os.getenv('APP_URL', 'https://my-rss-app.local')
 
 # Configuración de Base de Datos
 DATABASE_URL = os.getenv('DATABASE_URL', '')

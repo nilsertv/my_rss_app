@@ -18,9 +18,9 @@ class RSSGenerator:
         title = SubElement(channel, 'title')
         title.text = 'Latest Posts and Videos'
 
-        import os
+        from src.config import APP_URL
         link = SubElement(channel, 'link')
-        link.text = os.getenv('APP_URL', 'https://my-rss-app.local')
+        link.text = APP_URL
 
         description = SubElement(channel, 'description')
         description.text = 'This RSS feed contains the latest posts and videos from various sources.'
