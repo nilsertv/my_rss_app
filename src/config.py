@@ -32,8 +32,6 @@ IFTTT_WEBHOOK_URL = os.getenv('IFTTT_WEBHOOK_URL', '')
 INTERVAL = int(os.getenv('INTERVAL', 600))
 POST_DELAY = int(os.getenv('POST_DELAY', 225))
 
-# Mistral AI
-MISTRAL_API_KEY = os.getenv('MISTRAL_API_KEY', '')
 
 
 def load_yaml_config(config_path: Path = None) -> dict:
@@ -61,6 +59,5 @@ def get_app_config() -> dict:
         'host': HOST,
         'database_url': DATABASE_URL,
         'ifttt_webhook_url': IFTTT_WEBHOOK_URL or yaml_config.get('ifttt_webhook_url', ''),
-        'mistral_api_key': MISTRAL_API_KEY,
         'sections': yaml_config.get('sections', {})
     }
