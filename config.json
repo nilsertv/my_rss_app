@@ -1,5 +1,4 @@
 {
-    "ifttt_webhook_url": "https://maker.ifttt.com/trigger/new_rss_entry/with/key/REDACTED_IFTTT_KEY",
-    "initial_prompt": "Please summarize the following article/video for Twitter:"
-  }
-  
+  "ifttt_webhook_url": "",
+  "initial_prompt": "Please summarize the following article/video for Twitter:"
+}

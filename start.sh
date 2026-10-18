@@ -1,51 +1,60 @@
 #!/bin/bash
+set -e
 
-# Script de inicio para ejecutar ambos procesos
+echo "Starting My RSS App services..."
 
-# Crear directorio de datos si no existe
-mkdir -p /data
+# Asegurar existencia de directorio de datos y logs
+DATA_DIRECTORY="${FEED_DIR:-/data}"
+mkdir -p "$DATA_DIRECTORY"
+mkdir -p "./logs"
 
-# Asegurar permisos de escritura en /data
-chmod 777 /data
-
-# Iniciar el servidor web en background
-echo "Starting web server..."
-python -m src.webserver &
+# Iniciar Gunicorn para el servidor web en background
+echo "Starting Gunicorn Web Server on 0.0.0.0:${PORT:-8080}..."
+gunicorn \
+    --workers 2 \
+    --bind "0.0.0.0:${PORT:-8080}" \
+    --access-logfile - \
+    --error-logfile - \
+    src.webserver:app &
 WEBSERVER_PID=$!
 
-# Esperar un momento para que el servidor inicie
-sleep 3
+# Esperar para verificación inicial
+sleep 2
 
-# Iniciar el worker principal
-echo "Starting RSS worker..."
+# Iniciar el worker RSS en background
+echo "Starting RSS Worker Daemon..."
 python -m src.main &
 WORKER_PID=$!
 
-# Función para manejar señales de terminación
+# Manejador de señales de terminación limpia (Coolify envía SIGTERM al detener/replegar)
 cleanup() {
-    echo "Shutting down..."
-    kill $WEBSERVER_PID $WORKER_PID 2>/dev/null
-    wait $WEBSERVER_PID $WORKER_PID
+    echo "Termination signal received. Stopping services gracefully..."
+    kill -TERM "$WEBSERVER_PID" "$WORKER_PID" 2>/dev/null || true
+    wait "$WEBSERVER_PID" "$WORKER_PID" 2>/dev/null || true
+    echo "All services stopped."
     exit 0
 }
 
-# Registrar manejador de señales
 trap cleanup SIGTERM SIGINT
 
-# Mantener el script corriendo y monitorear los procesos
+# Monitorear procesos en bucle
 while true; do
-    # Verificar si los procesos están corriendo
-    if ! kill -0 $WEBSERVER_PID 2>/dev/null; then
-        echo "Web server died, restarting..."
-        python -m src.webserver &
+    if ! kill -0 "$WEBSERVER_PID" 2>/dev/null; then
+        echo "Web server exited. Restarting Gunicorn..."
+        gunicorn \
+            --workers 2 \
+            --bind "0.0.0.0:${PORT:-8080}" \
+            --access-logfile - \
+            --error-logfile - \
+            src.webserver:app &
         WEBSERVER_PID=$!
     fi
     
-    if ! kill -0 $WORKER_PID 2>/dev/null; then
-        echo "Worker died, restarting..."
+    if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+        echo "RSS Worker exited. Restarting Worker..."
         python -m src.main &
         WORKER_PID=$!
     fi
     
-    sleep 10
+    sleep 5
 done

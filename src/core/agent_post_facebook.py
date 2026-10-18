@@ -1,31 +1,45 @@
+"""
+Módulo opcional/experimental para interacción con agente de Mistral AI.
+"""
 import os
-from typing import Any
+import logging
+from typing import Any, Optional
 
-from mistralai import Mistral
+logger = logging.getLogger('AgentPostFacebook')
 
-# Initialize the client
-api_key = "REDACTED_MISTRAL_API_KEY"  #os.environ.get("MISTRAL_API_KEY")
-client = Mistral(api_key)
 
-inputs: list[dict[str, Any]] = [
-  {
-    "role": "user",
-    "content": "https://elpais.com/internacional/2025-11-07/el-cierre-del-gobierno-de-ee-uu-lastra-desde-el-viernes-el-trafico-de-los-principales-aeropuertos-del-pais.html",
-  }
-]
+def post_to_mistral_agent(url: str, agent_id: str = "ag_019a5a4b29c070488d4d6d56c6f4f435") -> Optional[dict]:
+    """Envía una URL al agente de Mistral para generar resumen/post."""
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        logger.warning("MISTRAL_API_KEY not configured. Skipping Mistral agent call.")
+        return None
 
-try:
-    # Make the API call
-    response = client.beta.conversations.start(
-        inputs=inputs,  # type: ignore
-        agent_id="ag_019a5a4b29c070488d4d6d56c6f4f435",
-    )
-    
-    # Acceder a los atributos dinámicamente para evitar errores de tipo
-    response_dict = response.__dict__ if hasattr(response, '__dict__') else {}
-    print(response_dict)
-    
-    # Si sabes la estructura exacta, puedes acceder así:
-    # print(response.conversation_id)  # o similar
-except Exception as e:
-    print(f"Error: {str(e)}")
+    try:
+        from mistralai import Mistral
+        client = Mistral(api_key=api_key)
+        
+        inputs: list[dict[str, Any]] = [
+            {
+                "role": "user",
+                "content": url,
+            }
+        ]
+
+        response = client.beta.conversations.start(
+            inputs=inputs,  # type: ignore
+            agent_id=agent_id,
+        )
+        
+        response_dict = response.__dict__ if hasattr(response, '__dict__') else {}
+        return response_dict
+    except Exception as e:
+        logger.error(f"Error calling Mistral agent: {e}")
+        return None
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    test_url = "https://elpais.com/internacional/2025-11-07/el-cierre-del-gobierno-de-ee-uu-lastra-desde-el-viernes-el-trafico-de-los-principales-aeropuertos-del-pais.html"
+    result = post_to_mistral_agent(test_url)
+    print("Result:", result)

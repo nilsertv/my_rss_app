@@ -5,6 +5,8 @@ description = "RSS aggregator with web server and persistent storage"
 authors = ["Nils Tejedor <ntejedov@example.com>"]
 readme = "README.md"
 license = "MIT"
+packages = [{include = "src"}]
+
 
 [tool.poetry.dependencies]
 python = "^3.9"

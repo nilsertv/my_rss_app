@@ -14,3 +14,7 @@ tests/
 .idea
 legacy/
 .github
+*.ps1
+fly.toml*
+logs/
+data/

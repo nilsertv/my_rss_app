@@ -1,37 +1,45 @@
-# Usa una imagen base de Python
-FROM python:3.9-slim
+# Imagen base moderna y ligera
+FROM python:3.11-slim
 
-# Establecer el directorio de trabajo
+# Evitar generación de .pyc y forzar buffer inmediato de stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/workspace \
+    PORT=8080 \
+    FEED_DIR=/data
+
 WORKDIR /workspace
 
-# Instalar Poetry
-RUN pip install --no-cache-dir poetry
+# Instalar curl para HEALTHCHECK y dependencias de sistema si fueran necesarias
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copiar archivos de Poetry
+# Instalar Poetry
+RUN pip install --no-cache-dir "poetry>=1.8.0"
+
+# Copiar configuración de dependencias de Poetry
 COPY pyproject.toml poetry.lock ./
 
-# Configurar Poetry para no crear virtualenv y instalar dependencias
+# Instalar dependencias en el sistema global del contenedor sin virtualenv
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --no-root --only main
 
-# Copiar el resto de los archivos de la aplicación
+# Crear directorio de datos persistente para el feed y logs
+RUN mkdir -p /data /workspace/logs && chmod 777 /data /workspace/logs
+
+# Copiar el código de la aplicación
 COPY . .
 
-# Configurar PYTHONPATH para que Python encuentre el paquete src
-ENV PYTHONPATH=/workspace
-
-# Hacer el script de inicio ejecutable
+# Asegurar permisos de ejecución en el script de arranque
 RUN chmod +x start.sh
 
-# Crear el directorio de datos con permisos apropiados
-RUN mkdir -p /data && chmod 777 /data
-
-# Excluir archivos de logs y otros innecesarios usando .dockerignore (se detalla abajo)
-# Crear un volumen para los logs
-#VOLUME /app/logs
-
-# Exponer el puerto que la aplicación utilizará
+# Puerto expuesto por defecto
 EXPOSE 8080
 
-# Comando para ejecutar la aplicación
-CMD ["sh", "start.sh"]
+# Healthcheck nativo para monitorización automática en Coolify / Docker
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Arrancar con bash para soportar job control y señales
+CMD ["bash", "start.sh"]

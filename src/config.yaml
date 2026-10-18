@@ -1,8 +1,5 @@
-interval: 600  # Intervalo en segundos
+interval: 600  # Intervalo en segundos por defecto (sobreescribible con INTERVAL)
 log_file: "app.log"
-ifttt_webhook_url: "https://maker.ifttt.com/trigger/rss_process_completed/with/key/REDACTED_IFTTT_KEY"
-database:
-  connection_url: "${DATABASE_URL}" # URL movida a variable de entorno DATABASE_URL
 sections:
   Youtube:
     - url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCJOdW-8tYGjzJj2t77rBmXA"
