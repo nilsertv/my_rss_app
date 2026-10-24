@@ -14,6 +14,7 @@ services:
       - INTERVAL=${INTERVAL:-600}
       - POST_DELAY=${POST_DELAY:-225}
       - APP_URL=${APP_URL:-https://my-rss-app.local}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-rss-admin-2026}
     volumes:
       - rss_data:/data
     healthcheck:

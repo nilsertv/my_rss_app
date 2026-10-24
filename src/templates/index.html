@@ -1,0 +1,2094 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pulse — Lector y Generador RSS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500&family=Switzer:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-canvas: #F7F6F2;
+      --bg-surface: #FFFFFF;
+      --bg-subtle: #EFECE6;
+      --bg-hover: #F2F0EB;
+      --text-primary: #141413;
+      --text-secondary: #5C5B57;
+      --text-muted: #5E5D58;
+      --border-hairline: #E5E3DC;
+      --border-strong: #CFCBC0;
+      --accent-green: #216338;
+      --accent-green-bg: #E9F3EC;
+      --accent-ink: #141413;
+      --danger-text: #9F2F2D;
+      --danger-bg: #FDEBEC;
+
+      --tag-blue-bg: #E1F3FE;
+      --tag-blue-fg: #185A85;
+      --tag-amber-bg: #FBF3DB;
+      --tag-amber-fg: #7D5300;
+      --tag-green-bg: #EAF3EC;
+      --tag-green-fg: #265936;
+      --tag-red-bg: #FDEBEC;
+      --tag-red-fg: #942927;
+      --tag-neutral-bg: #ECEAE3;
+      --tag-neutral-fg: #454440;
+
+      --font-sans: 'Switzer', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-serif: 'Newsreader', Georgia, serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    ::selection {
+      background: var(--accent-green-bg);
+      color: var(--text-primary);
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-canvas);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 3px;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      line-height: 1.6;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    button, input, select, textarea {
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    a:focus-visible {
+      outline: 2px solid var(--accent-green);
+      outline-offset: 2px;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* =================================================================
+       AUTH SCREEN
+    ================================================================= */
+    .auth-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-lg);
+      padding: 40px 36px;
+    }
+
+    .auth-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .auth-brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+    }
+
+    .auth-title {
+      font-family: var(--font-serif);
+      font-size: 36px;
+      font-weight: 400;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+
+    .auth-desc {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    .field-group {
+      margin-bottom: 18px;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .input-control {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .input-control:focus {
+      background: var(--bg-surface);
+      border-color: var(--text-primary);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13.5px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background-color 150ms ease, transform 120ms ease, border-color 150ms ease;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: var(--accent-ink);
+      color: #FFFFFF;
+    }
+
+    .btn-primary:hover {
+      background: #2C2C2A;
+    }
+
+    .btn-green {
+      background: var(--accent-green);
+      color: #FFFFFF;
+    }
+
+    .btn-green:hover {
+      background: #1A502D;
+    }
+
+    .btn-secondary {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border-color: var(--border-hairline);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+    }
+
+    .btn-danger-ghost {
+      background: transparent;
+      color: var(--danger-text);
+      padding: 6px 10px;
+      font-size: 12.5px;
+    }
+
+    .btn-danger-ghost:hover {
+      background: var(--danger-bg);
+    }
+
+    .auth-footer {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border-hairline);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+
+    .auth-footer a {
+      color: var(--text-primary);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    /* =================================================================
+       APP SHELL (3-ZONE FEEDLY LAYOUT)
+    ================================================================= */
+    .app-shell {
+      display: grid;
+      grid-template-columns: 272px 1fr;
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-hairline);
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 30;
+    }
+
+    .sidebar-header {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-section {
+      padding: 18px 12px 8px;
+    }
+
+    .sidebar-heading {
+      padding: 0 10px 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: left;
+      transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .nav-item-label {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nav-count {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .nav-item.active .nav-count {
+      color: var(--accent-green);
+    }
+
+    .custom-feed-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px 6px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-secondary);
+      gap: 6px;
+    }
+
+    .custom-feed-row:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .custom-feed-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+      background: none;
+      border: none;
+      text-align: left;
+      font-weight: 500;
+    }
+
+    .icon-btn-mini {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 4px 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .icon-btn-mini:hover {
+      background: var(--bg-surface);
+      border-color: var(--border-hairline);
+      color: var(--text-primary);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px 12px;
+      border-top: 1px solid var(--border-hairline);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* MAIN CONTENT */
+    .main-area {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(247, 246, 242, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-hairline);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 7px;
+      cursor: pointer;
+    }
+
+    .view-heading {
+      font-family: var(--font-serif);
+      font-size: 30px;
+      font-weight: 400;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    .view-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .topbar-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      width: 240px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 7px 30px 7px 32px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      font-size: 13.5px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .kbd-hint {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 1px 5px;
+      border: 1px solid var(--border-hairline);
+      border-radius: 4px;
+      background: var(--bg-canvas);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .density-group {
+      display: inline-flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+    }
+
+    .density-btn {
+      border: none;
+      background: transparent;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .density-btn.active {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+    }
+
+    .content-container {
+      max-width: 1060px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 32px 64px;
+    }
+
+    /* =================================================================
+       STREAM LAYOUTS (MAGAZINE / CARDS / COMPACT)
+    ================================================================= */
+    .stream-magazine {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .article-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      display: grid;
+      grid-template-columns: 1fr 160px;
+      gap: 20px;
+      align-items: start;
+      cursor: pointer;
+      transition: border-color 150ms ease, box-shadow 200ms ease;
+    }
+
+    .article-card.no-thumb {
+      grid-template-columns: 1fr;
+    }
+
+    .article-card:hover {
+      border-color: var(--border-strong);
+      box-shadow: 0 2px 10px rgba(20, 20, 19, 0.04);
+    }
+
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .section-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 9px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .pill-noticias { background: var(--tag-blue-bg); color: var(--tag-blue-fg); }
+    .pill-internacionales { background: var(--tag-amber-bg); color: var(--tag-amber-fg); }
+    .pill-cienciaytech { background: var(--tag-green-bg); color: var(--tag-green-fg); }
+    .pill-youtube { background: var(--tag-red-bg); color: var(--tag-red-fg); }
+    .pill-default { background: var(--tag-neutral-bg); color: var(--tag-neutral-fg); }
+
+    .article-source {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .article-title {
+      font-family: var(--font-serif);
+      font-size: 23px;
+      font-weight: 400;
+      line-height: 1.22;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .article-excerpt {
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      max-width: 68ch;
+    }
+
+    .article-thumb {
+      width: 160px;
+      height: 104px;
+      object-fit: cover;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-subtle);
+    }
+
+    /* CARDS GRID VIEW */
+    .stream-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .stream-cards .article-card {
+      grid-template-columns: 1fr;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .stream-cards .article-thumb {
+      width: 100%;
+      height: 168px;
+      order: -1;
+      margin-bottom: 12px;
+    }
+
+    .stream-cards .article-title {
+      font-size: 20px;
+    }
+
+    /* COMPACT LIST VIEW */
+    .stream-compact {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .stream-compact .article-card {
+      border: none;
+      border-bottom: 1px solid var(--border-hairline);
+      border-radius: 0;
+      padding: 11px 18px;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .stream-compact .article-card:last-child {
+      border-bottom: none;
+    }
+
+    .stream-compact .article-thumb,
+    .stream-compact .article-excerpt {
+      display: none;
+    }
+
+    .stream-compact .article-meta {
+      margin-bottom: 0;
+    }
+
+    .stream-compact .article-title {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* =================================================================
+       CUSTOM RSS BUILDER & SOURCES / YAML PANELS
+    ================================================================= */
+    .panel-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-hairline);
+      flex-wrap: wrap;
+    }
+
+    .panel-title {
+      font-family: var(--font-serif);
+      font-size: 26px;
+      font-weight: 400;
+      line-height: 1.15;
+    }
+
+    .panel-subtitle {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .chips-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .chip-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-canvas);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+      transition: all 120ms ease;
+    }
+
+    .chip-toggle.selected {
+      background: var(--accent-green-bg);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .chip-toggle.excluded {
+      background: var(--danger-bg);
+      border-color: var(--danger-text);
+      color: var(--danger-text);
+    }
+
+    .url-preview-box {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .url-preview-code {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--text-primary);
+      word-break: break-all;
+    }
+
+    /* SOURCES MANAGER */
+    .tab-bar {
+      display: inline-flex;
+      background: var(--bg-subtle);
+      padding: 3px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .add-source-grid {
+      display: grid;
+      grid-template-columns: 180px 1fr 130px auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .sources-section-group {
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .sources-section-header {
+      padding: 12px 18px;
+      background: var(--bg-canvas);
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 13.5px;
+    }
+
+    .source-row {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13.5px;
+    }
+
+    .source-row:last-child {
+      border-bottom: none;
+    }
+
+    .source-url {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+
+    .yaml-editor {
+      width: 100%;
+      min-height: 440px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.55;
+      padding: 16px;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      resize: vertical;
+    }
+
+    /* =================================================================
+       SLIDE-OVER READER DRAWER
+    ================================================================= */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 20, 19, 0.25);
+      z-index: 50;
+      display: none;
+      justify-content: flex-end;
+    }
+
+    .drawer-backdrop.open {
+      display: flex;
+    }
+
+    .reader-drawer {
+      width: 100%;
+      max-width: 640px;
+      background: var(--bg-surface);
+      height: 100vh;
+      border-left: 1px solid var(--border-hairline);
+      padding: 32px 36px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .reader-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border-hairline);
+      margin-bottom: 24px;
+    }
+
+    .reader-title {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 400;
+      line-height: 1.15;
+      margin: 14px 0 18px;
+    }
+
+    .reader-image {
+      width: 100%;
+      max-height: 340px;
+      object-fit: cover;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-hairline);
+      margin-bottom: 22px;
+    }
+
+    .reader-body {
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      white-space: pre-line;
+      margin-bottom: 32px;
+    }
+
+    /* TOAST NOTIFICATION */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--text-primary);
+      color: #FFFFFF;
+      padding: 11px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13.5px;
+      font-weight: 500;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .empty-state {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 960px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        transform: translateX(-100%);
+        transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .mobile-menu-btn {
+        display: inline-flex;
+      }
+      .topbar {
+        padding: 12px 18px;
+      }
+      .content-container {
+        padding: 20px 18px 48px;
+      }
+      .article-card {
+        grid-template-columns: 1fr;
+      }
+      .article-thumb {
+        width: 100%;
+        height: 180px;
+        order: -1;
+      }
+      .grid-2,
+      .add-source-grid {
+        grid-template-columns: 1fr;
+      }
+      .reader-drawer {
+        padding: 22px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =================================================================
+       1. PANTALLA DE ACCESO PROTEGIDO (BACKEND AUTH)
+  ================================================================== -->
+  <main id="authView" class="auth-wrapper hidden">
+    <section class="auth-card" aria-labelledby="loginHeading">
+      <div class="auth-brand">
+        <span class="auth-brand-dot"></span>
+        <span>Pulse RSS Studio</span>
+      </div>
+      <h1 id="loginHeading" class="auth-title">Acceso al panel editorial</h1>
+      <p class="auth-desc">
+        La gestión de fuentes en <code>config.yaml</code>, base de datos y creación de feeds está protegida por el API del servidor.
+      </p>
+      <form id="loginForm">
+        <div class="field-group">
+          <label class="field-label" for="adminTokenInput">Clave de administrador (ADMIN_TOKEN)</label>
+          <input
+            id="adminTokenInput"
+            type="password"
+            class="input-control"
+            placeholder="Ingresa tu token de acceso..."
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        <p id="loginError" style="color: var(--danger-text); font-size: 13px; margin-bottom: 14px;" class="hidden"></p>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Desbloquear espacio de trabajo
+        </button>
+      </form>
+      <div class="auth-footer">
+        <span>Feeds XML públicos activos</span>
+        <a href="/feed.xml" target="_blank" rel="noopener">Ver /feed.xml público</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- =================================================================
+       2. WORKSPACE PRINCIPAL ESTILO FEEDLY
+  ================================================================== -->
+  <div id="appView" class="app-shell hidden">
+    <!-- SIDEBAR IZQUIERDO -->
+    <aside id="sidebar" class="sidebar" aria-label="Navegación de feeds y fuentes">
+      <div class="sidebar-header">
+        <div class="brand-lockup">
+          <span class="auth-brand-dot"></span>
+          <span>Pulse RSS</span>
+        </div>
+        <button id="syncNowBtn" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;" title="Ejecutar ingesta de fuentes ahora">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 16h5v5"/>
+          </svg>
+          <span>Actualizar</span>
+        </button>
+      </div>
+
+      <!-- SECCIONES DE LECTURA -->
+      <div class="sidebar-section">
+        <div class="sidebar-heading">
+          <span>Canales de Lectura</span>
+        </div>
+        <ul class="nav-list" id="sectionsNavList">
+          <!-- Renderizado dinámico -->
+        </ul>
+      </div>
+
+      <!-- FEEDS PÚBLICOS PARA IFTTT / APPS -->
+      <div class="sidebar-section">
+        <div class="sidebar-heading">
+          <span>Links RSS Públicos (IFTTT)</span>
+          <button id="newCustomFeedSidebarBtn" class="icon-btn-mini" title="Crear nuevo RSS personalizado">+ Crear</button>
+        </div>
+        <div id="customFeedsSidebarList">
+          <!-- Renderizado dinámico -->
+        </div>
+      </div>
+
+      <!-- ACCIONES DE CONFIGURACIÓN -->
+      <div class="sidebar-footer">
+        <button id="openSourcesManagerBtn" class="nav-item">
+          <span class="nav-item-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+              <path d="M12 3v18M3 12h18"/>
+            </svg>
+            <span>Fuentes &amp; config.yaml</span>
+          </span>
+        </button>
+        <button id="openBuilderModeBtn" class="nav-item">
+          <span class="nav-item-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+              <path d="M4 11a9 9 0 0 1 9 9"/>
+              <path d="M4 4a16 16 0 0 1 16 16"/>
+              <circle cx="5" cy="19" r="1"/>
+            </svg>
+            <span>Generador RSS Público</span>
+          </span>
+        </button>
+        <button id="logoutBtn" class="nav-item" style="color: var(--danger-text);">
+          <span class="nav-item-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            <span>Cerrar sesión</span>
+          </span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ÁREA CENTRAL -->
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Abrir menú">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+          <div>
+            <h1 id="currentViewTitle" class="view-heading">Todas las publicaciones</h1>
+            <span id="currentViewSubtitle" class="view-subtitle tabular">Cargando artículos...</span>
+          </div>
+        </div>
+
+        <div class="topbar-controls">
+          <div class="search-box">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input id="searchInput" type="search" placeholder="Filtrar titulares o temas..." />
+            <span class="kbd-hint">/</span>
+          </div>
+
+          <div class="density-group" role="group" aria-label="Modo de vista">
+            <button class="density-btn active" data-density="magazine" title="Vista Revista (Feedly)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                <rect x="3" y="4" width="18" height="6" rx="1"/>
+                <rect x="3" y="14" width="18" height="6" rx="1"/>
+              </svg>
+            </button>
+            <button class="density-btn" data-density="cards" title="Vista Tarjetas">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </button>
+            <button class="density-btn" data-density="compact" title="Lista Compacta">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          <button id="createRssFromViewBtn" class="btn btn-green">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 11a9 9 0 0 1 9 9"/>
+              <path d="M4 4a16 16 0 0 1 16 16"/>
+              <circle cx="5" cy="19" r="1"/>
+            </svg>
+            <span>Generar Link RSS</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="content-container">
+        <!-- ===========================================================
+             MODO 1: GENERADOR DE FEED RSS PÚBLICO (IFTTT / APPS)
+        ============================================================ -->
+        <section id="rssBuilderSection" class="panel-card hidden">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Generador de Feed RSS Público</h2>
+              <p class="panel-subtitle">
+                Combina secciones o filtros de palabras clave y genera un enlace XML público permanente para IFTTT, n8n o cualquier lector RSS.
+              </p>
+            </div>
+            <button id="closeBuilderBtn" class="btn btn-secondary">Volver al lector</button>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label" for="customFeedName">Nombre del Feed</label>
+              <input id="customFeedName" type="text" class="input-control" placeholder="Ej. Política y Tecnología Perú" />
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="customFeedSlug">Identificador del enlace (slug)</label>
+              <input id="customFeedSlug" type="text" class="input-control" placeholder="ej. politica-y-tech" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Secciones a incluir (deja vacío para incluir todas)</label>
+            <div id="builderIncludeChips" class="chips-wrap"></div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Secciones a excluir (ej. Youtube)</label>
+            <div id="builderExcludeChips" class="chips-wrap"></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label" for="customFeedQuery">Filtro opcional por palabra clave</label>
+              <input id="customFeedQuery" type="text" class="input-control" placeholder="Ej. inteligencia artificial, congreso..." />
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="customFeedLimit">Cantidad máxima de entradas en XML</label>
+              <select id="customFeedLimit" class="input-control">
+                <option value="15">15 artículos</option>
+                <option value="25" selected>25 artículos</option>
+                <option value="50">50 artículos</option>
+                <option value="100">100 artículos</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- URL PÚBLICA POR PARÁMETROS AL VUELO -->
+          <div class="url-preview-box">
+            <div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 3px;">
+                Link RSS público directo por parámetros (sin guardar)
+              </div>
+              <code id="instantRssUrlPreview" class="url-preview-code"></code>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button id="copyInstantRssBtn" type="button" class="btn btn-secondary">Copiar URL</button>
+              <button id="saveCustomFeedBtn" type="button" class="btn btn-green">Guardar Feed Permanente (/feeds/slug.xml)</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===========================================================
+             MODO 2: GESTOR DE FUENTES Y EDITOR CONFIG.YAML
+        ============================================================ -->
+        <section id="sourcesManagerSection" class="panel-card hidden">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Configuración de Fuentes &amp; config.yaml</h2>
+              <p class="panel-subtitle">
+                Agrega o quita fuentes RSS, canales de YouTube o páginas web bajo demanda. Los cambios se sincronizan en PostgreSQL y en <code>config.yaml</code>.
+              </p>
+            </div>
+            <button id="closeSourcesManagerBtn" class="btn btn-secondary">Volver al lector</button>
+          </div>
+
+          <div class="tab-bar">
+            <button class="tab-btn active" data-config-tab="visual">Gestor Visual de Fuentes</button>
+            <button class="tab-btn" data-config-tab="yaml">Editor Directo config.yaml</button>
+          </div>
+
+          <!-- SUB-TAB A: GESTOR VISUAL -->
+          <div id="configVisualPane">
+            <form id="addSourceForm" class="add-source-grid" style="margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-hairline);">
+              <div>
+                <label class="field-label" for="newSourceSection">Sección / Categoría</label>
+                <input id="newSourceSection" list="existingSectionsDatalist" class="input-control" placeholder="Ej. Noticias" required />
+                <datalist id="existingSectionsDatalist"></datalist>
+              </div>
+              <div>
+                <label class="field-label" for="newSourceUrl">URL del Feed RSS / Canal / Web</label>
+                <input id="newSourceUrl" type="url" class="input-control" placeholder="https://sitio.com/feed.xml" required />
+              </div>
+              <div>
+                <label class="field-label" for="newSourceType">Tipo</label>
+                <select id="newSourceType" class="input-control">
+                  <option value="rss">RSS / Atom</option>
+                  <option value="youtube">YouTube XML</option>
+                  <option value="web">Scraping Web</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary" style="height: 40px;">+ Agregar fuente</button>
+            </form>
+
+            <div id="sourcesGroupedContainer">
+              <!-- Fuentes agrupadas por sección -->
+            </div>
+          </div>
+
+          <!-- SUB-TAB B: EDITOR YAML DIRECTO -->
+          <div id="configYamlPane" class="hidden">
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+              Edita o inserta directamente el bloque completo de <code>config.yaml</code>. Al guardar, se validará la sintaxis y se actualizarán todas las fuentes activas.
+            </p>
+            <textarea id="yamlEditorTextarea" class="yaml-editor" spellcheck="false"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+              <button id="reloadYamlBtn" type="button" class="btn btn-secondary">Recargar desde servidor</button>
+              <button id="saveYamlBtn" type="button" class="btn btn-green">Guardar y Aplicar config.yaml</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===========================================================
+             MODO 3: STREAM DE ARTÍCULOS (LECTOR ESTILO FEEDLY)
+        ============================================================ -->
+        <section id="articlesStreamSection" aria-label="Artículos recientes">
+          <div id="articlesContainer" class="stream-magazine"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================
+       3. DRAWER LATERAL DE LECTURA DE ARTÍCULO
+  ================================================================== -->
+  <div id="readerBackdrop" class="drawer-backdrop" role="dialog" aria-modal="true" aria-labelledby="readerArticleTitle">
+    <article class="reader-drawer">
+      <div class="reader-top">
+        <span id="readerSectionBadge" class="section-pill pill-default">Sección</span>
+        <div style="display: flex; gap: 8px;">
+          <a id="readerExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+            Abrir fuente original
+          </a>
+          <button id="closeReaderBtn" class="btn btn-secondary">Cerrar</button>
+        </div>
+      </div>
+      <div id="readerMeta" class="article-source tabular"></div>
+      <h2 id="readerArticleTitle" class="reader-title"></h2>
+      <div id="readerArticleImageWrap" class="hidden"></div>
+      <div id="readerArticleContent" class="reader-body"></div>
+    </article>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const state = {
+      authenticated: false,
+      posts: [],
+      sections: [],
+      counts: {},
+      totalArticles: 0,
+      sources: [],
+      customFeeds: [],
+      activeFilter: {
+        mode: 'all', // 'all' | 'main_no_yt' | 'section' | 'custom_feed'
+        section: '',
+        exclude: [],
+        customFeed: null,
+        q: ''
+      },
+      density: 'magazine',
+      builder: {
+        include: new Set(),
+        exclude: new Set(['Youtube'])
+      }
+    };
+
+    const el = (id) => document.getElementById(id);
+
+    function showToast(msg) {
+      const t = el('toast');
+      t.textContent = msg;
+      t.classList.add('visible');
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => t.classList.remove('visible'), 3200);
+    }
+
+    function sectionPillClass(section = '') {
+      const s = section.toLowerCase();
+      if (s.includes('noticia')) return 'pill-noticias';
+      if (s.includes('internacional')) return 'pill-internacionales';
+      if (s.includes('ciencia') || s.includes('tech')) return 'pill-cienciaytech';
+      if (s.includes('youtube')) return 'pill-youtube';
+      return 'pill-default';
+    }
+
+    function formatDomain(url) {
+      try {
+        return new URL(url).hostname.replace(/^www\./, '');
+      } catch {
+        return url;
+      }
+    }
+
+    function formatRelativeTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      const diffMin = Math.round((Date.now() - d.getTime()) / 60000);
+      if (diffMin < 1) return 'Ahora';
+      if (diffMin < 60) return `hace ${diffMin}m`;
+      const diffH = Math.round(diffMin / 60);
+      if (diffH < 24) return `hace ${diffH}h`;
+      const diffD = Math.round(diffH / 24);
+      return `hace ${diffD}d`;
+    }
+
+    function stripHtml(raw = '') {
+      const doc = new DOMParser().parseFromString(raw, 'text/html');
+      return (doc.body.textContent || '').trim();
+    }
+
+    function slugify(text = '') {
+      return text
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    }
+
+    async function apiFetch(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options
+      });
+      if (res.status === 401 && path !== '/api/auth/login') {
+        showAuthScreen();
+        throw new Error('Sesión expirada');
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.message || `Error HTTP ${res.status}`);
+      }
+      return data;
+    }
+
+    /* ===============================================================
+       AUTENTICACIÓN
+    =============================================================== */
+    function showAuthScreen() {
+      state.authenticated = false;
+      el('appView').classList.add('hidden');
+      el('authView').classList.remove('hidden');
+      el('adminTokenInput').focus();
+    }
+
+    function showWorkspace() {
+      state.authenticated = true;
+      el('authView').classList.add('hidden');
+      el('appView').classList.remove('hidden');
+    }
+
+    el('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const token = el('adminTokenInput').value.trim();
+      const errEl = el('loginError');
+      errEl.classList.add('hidden');
+      try {
+        await apiFetch('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ token })
+        });
+        el('adminTokenInput').value = '';
+        showWorkspace();
+        await initializeWorkspaceData();
+      } catch (err) {
+        errEl.textContent = err.message || 'Clave de administrador inválida.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    el('logoutBtn').addEventListener('click', async () => {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      showAuthScreen();
+    });
+
+    /* ===============================================================
+       CARGA Y RENDERIZADO DEL WORKSPACE
+    =============================================================== */
+    async function initializeWorkspaceData() {
+      await Promise.all([
+        loadPosts(),
+        loadCustomFeeds(),
+        loadSources()
+      ]);
+    }
+
+    async function loadPosts() {
+      const params = new URLSearchParams();
+      if (state.activeFilter.mode === 'main_no_yt') {
+        params.set('exclude', 'Youtube');
+      } else if (state.activeFilter.mode === 'section' && state.activeFilter.section) {
+        params.set('sections', state.activeFilter.section);
+      } else if (state.activeFilter.mode === 'custom_feed' && state.activeFilter.customFeed) {
+        const cf = state.activeFilter.customFeed;
+        if (cf.sections && cf.sections.length) params.set('sections', cf.sections.join(','));
+        if (cf.exclude_sections && cf.exclude_sections.length) params.set('exclude', cf.exclude_sections.join(','));
+        if (cf.search_query) params.set('q', cf.search_query);
+        params.set('limit', cf.max_items || 40);
+      }
+      if (state.activeFilter.q) {
+        params.set('q', state.activeFilter.q);
+      }
+      if (!params.has('limit')) params.set('limit', '50');
+
+      const data = await apiFetch(`/api/posts?${params.toString()}`);
+      state.posts = data.posts || [];
+      state.counts = data.counts || {};
+      state.totalArticles = data.total_articles || 0;
+      state.sections = data.sections || [];
+
+      renderSidebarSections();
+      renderStreamHeader();
+      renderArticles();
+      renderBuilderSectionChips();
+    }
+
+    function renderSidebarSections() {
+      const list = el('sectionsNavList');
+      list.innerHTML = '';
+
+      const allItem = document.createElement('li');
+      allItem.innerHTML = `
+        <button class="nav-item ${state.activeFilter.mode === 'all' ? 'active' : ''}">
+          <span class="nav-item-label">Todas las fuentes</span>
+          <span class="nav-count">${state.totalArticles}</span>
+        </button>
+      `;
+      allItem.querySelector('button').addEventListener('click', () => {
+        state.activeFilter = { mode: 'all', section: '', exclude: [], customFeed: null, q: state.activeFilter.q };
+        closeMobileSidebar();
+        loadPosts();
+      });
+      list.appendChild(allItem);
+
+      const mainFeedItem = document.createElement('li');
+      const noYtCount = state.totalArticles - (state.counts['Youtube'] || 0);
+      mainFeedItem.innerHTML = `
+        <button class="nav-item ${state.activeFilter.mode === 'main_no_yt' ? 'active' : ''}">
+          <span class="nav-item-label">Feed Principal (Sin YT)</span>
+          <span class="nav-count">${Math.max(0, noYtCount)}</span>
+        </button>
+      `;
+      mainFeedItem.querySelector('button').addEventListener('click', () => {
+        state.activeFilter = { mode: 'main_no_yt', section: '', exclude: ['Youtube'], customFeed: null, q: state.activeFilter.q };
+        closeMobileSidebar();
+        loadPosts();
+      });
+      list.appendChild(mainFeedItem);
+
+      state.sections.forEach((sec) => {
+        const li = document.createElement('li');
+        const isActive = state.activeFilter.mode === 'section' && state.activeFilter.section === sec;
+        const cnt = state.counts[sec] || 0;
+        li.innerHTML = `
+          <button class="nav-item ${isActive ? 'active' : ''}">
+            <span class="nav-item-label">#${sec}</span>
+            <span class="nav-count">${cnt}</span>
+          </button>
+        `;
+        li.querySelector('button').addEventListener('click', () => {
+          state.activeFilter = { mode: 'section', section: sec, exclude: [], customFeed: null, q: state.activeFilter.q };
+          closeMobileSidebar();
+          loadPosts();
+        });
+        list.appendChild(li);
+      });
+    }
+
+    function renderStreamHeader() {
+      const titleEl = el('currentViewTitle');
+      const subEl = el('currentViewSubtitle');
+
+      if (state.activeFilter.mode === 'all') {
+        titleEl.textContent = 'Todas las publicaciones';
+      } else if (state.activeFilter.mode === 'main_no_yt') {
+        titleEl.textContent = 'Feed Principal (Excluyendo YouTube)';
+      } else if (state.activeFilter.mode === 'section') {
+        titleEl.textContent = `Sección · ${state.activeFilter.section}`;
+      } else if (state.activeFilter.mode === 'custom_feed' && state.activeFilter.customFeed) {
+        titleEl.textContent = `Feed Público · ${state.activeFilter.customFeed.name}`;
+      }
+
+      subEl.textContent = `${state.posts.length} artículos en vista`;
+    }
+
+    function renderArticles() {
+      const container = el('articlesContainer');
+      container.className = `stream-${state.density}`;
+      container.innerHTML = '';
+
+      if (!state.posts.length) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p style="font-family: var(--font-serif); font-size: 24px; color: var(--text-primary); margin-bottom: 6px;">
+              Sin artículos para este filtro
+            </p>
+            <p style="font-size: 13.5px;">
+              Prueba cambiando de sección o pulsa "Actualizar" para consultar las fuentes RSS en vivo.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      state.posts.forEach((post) => {
+        const card = document.createElement('article');
+        const hasImg = Boolean(post.image_url);
+        card.className = `article-card ${hasImg ? '' : 'no-thumb'}`;
+
+        const cleanExcerpt = stripHtml(post.content || '');
+        const domain = formatDomain(post.url);
+        const relTime = formatRelativeTime(post.timestamp);
+        const pillClass = sectionPillClass(post.section);
+
+        card.innerHTML = `
+          <div>
+            <div class="article-meta">
+              <span class="section-pill ${pillClass}">${post.section || 'General'}</span>
+              <span class="article-source">${domain}</span>
+              ${relTime ? `<span class="article-source tabular">· ${relTime}</span>` : ''}
+            </div>
+            <h2 class="article-title">${post.title || 'Sin título'}</h2>
+            <p class="article-excerpt">${cleanExcerpt}</p>
+          </div>
+          ${hasImg ? `<img class="article-thumb" src="${post.image_url}" alt="" loading="lazy" onerror="this.style.display='none'; this.parentElement.classList.add('no-thumb');" />` : ''}
+        `;
+
+        card.addEventListener('click', () => openArticleReader(post));
+        container.appendChild(card);
+      });
+    }
+
+    function openArticleReader(post) {
+      const badge = el('readerSectionBadge');
+      badge.textContent = post.section || 'General';
+      badge.className = `section-pill ${sectionPillClass(post.section)}`;
+
+      el('readerArticleTitle').textContent = post.title || 'Sin título';
+      el('readerMeta').textContent = `${formatDomain(post.url)} · ${formatRelativeTime(post.timestamp)}`;
+      el('readerExternalLink').href = post.url || '#';
+      el('readerArticleContent').textContent = stripHtml(post.content || 'Sin contenido descriptivo.');
+
+      const imgWrap = el('readerArticleImageWrap');
+      if (post.image_url) {
+        imgWrap.innerHTML = `<img class="reader-image" src="${post.image_url}" alt="" />`;
+        imgWrap.classList.remove('hidden');
+      } else {
+        imgWrap.innerHTML = '';
+        imgWrap.classList.add('hidden');
+      }
+
+      el('readerBackdrop').classList.add('open');
+    }
+
+    el('closeReaderBtn').addEventListener('click', () => el('readerBackdrop').classList.remove('open'));
+    el('readerBackdrop').addEventListener('click', (e) => {
+      if (e.target === el('readerBackdrop')) el('readerBackdrop').classList.remove('open');
+    });
+
+    /* ===============================================================
+       FEEDS PÚBLICOS PERSONALIZADOS (IFTTT / APPS EXTERNAS)
+    =============================================================== */
+    async function loadCustomFeeds() {
+      const data = await apiFetch('/api/custom-feeds');
+      state.customFeeds = data.feeds || [];
+      renderCustomFeedsSidebar();
+    }
+
+    function renderCustomFeedsSidebar() {
+      const container = el('customFeedsSidebarList');
+      container.innerHTML = '';
+
+      const defaultFeedUrl = `${window.location.origin}/feed.xml`;
+      const defaultRow = document.createElement('div');
+      defaultRow.className = 'custom-feed-row';
+      defaultRow.innerHTML = `
+        <button class="custom-feed-name" title="Ver artículos del feed principal">/feed.xml (Principal)</button>
+        <button class="icon-btn-mini" data-copy="${defaultFeedUrl}" title="Copiar link público para IFTTT">Copiar</button>
+      `;
+      defaultRow.querySelector('.custom-feed-name').addEventListener('click', () => {
+        state.activeFilter = { mode: 'main_no_yt', section: '', exclude: ['Youtube'], customFeed: null, q: '' };
+        loadPosts();
+      });
+      defaultRow.querySelector('[data-copy]').addEventListener('click', () => {
+        navigator.clipboard.writeText(defaultFeedUrl);
+        showToast('Link público /feed.xml copiado al portapapeles');
+      });
+      container.appendChild(defaultRow);
+
+      state.customFeeds.forEach((cf) => {
+        const row = document.createElement('div');
+        row.className = 'custom-feed-row';
+        row.innerHTML = `
+          <button class="custom-feed-name" title="${cf.public_url}">${cf.name}</button>
+          <button class="icon-btn-mini" data-copy="${cf.public_url}" title="Copiar URL pública XML">Copiar</button>
+          <button class="icon-btn-mini" data-del="${cf.slug}" title="Eliminar feed" style="color: var(--danger-text);">×</button>
+        `;
+        row.querySelector('.custom-feed-name').addEventListener('click', () => {
+          state.activeFilter = { mode: 'custom_feed', section: '', exclude: [], customFeed: cf, q: '' };
+          closeMobileSidebar();
+          loadPosts();
+        });
+        row.querySelector('[data-copy]').addEventListener('click', () => {
+          navigator.clipboard.writeText(cf.public_url);
+          showToast(`URL pública copiada: ${cf.public_url}`);
+        });
+        row.querySelector('[data-del]').addEventListener('click', async () => {
+          await apiFetch(`/api/custom-feeds/${cf.slug}`, { method: 'DELETE' });
+          showToast('Feed personalizado eliminado');
+          await loadCustomFeeds();
+        });
+        container.appendChild(row);
+      });
+    }
+
+    function renderBuilderSectionChips() {
+      const incWrap = el('builderIncludeChips');
+      const excWrap = el('builderExcludeChips');
+      incWrap.innerHTML = '';
+      excWrap.innerHTML = '';
+
+      state.sections.forEach((sec) => {
+        const incChip = document.createElement('button');
+        incChip.type = 'button';
+        incChip.className = `chip-toggle ${state.builder.include.has(sec) ? 'selected' : ''}`;
+        incChip.textContent = `#${sec}`;
+        incChip.addEventListener('click', () => {
+          if (state.builder.include.has(sec)) state.builder.include.delete(sec);
+          else {
+            state.builder.include.add(sec);
+            state.builder.exclude.delete(sec);
+          }
+          renderBuilderSectionChips();
+          updateInstantRssPreviewUrl();
+        });
+        incWrap.appendChild(incChip);
+
+        const excChip = document.createElement('button');
+        excChip.type = 'button';
+        excChip.className = `chip-toggle ${state.builder.exclude.has(sec) ? 'excluded' : ''}`;
+        excChip.textContent = `Excluir ${sec}`;
+        excChip.addEventListener('click', () => {
+          if (state.builder.exclude.has(sec)) state.builder.exclude.delete(sec);
+          else {
+            state.builder.exclude.add(sec);
+            state.builder.include.delete(sec);
+          }
+          renderBuilderSectionChips();
+          updateInstantRssPreviewUrl();
+        });
+        excWrap.appendChild(excChip);
+      });
+
+      updateInstantRssPreviewUrl();
+    }
+
+    function updateInstantRssPreviewUrl() {
+      const params = new URLSearchParams();
+      if (state.builder.include.size > 0) {
+        params.set('sections', Array.from(state.builder.include).join(','));
+      }
+      if (state.builder.exclude.size > 0) {
+        params.set('exclude', Array.from(state.builder.exclude).join(','));
+      }
+      const q = el('customFeedQuery').value.trim();
+      if (q) params.set('q', q);
+      const limit = el('customFeedLimit').value;
+      if (limit && limit !== '25') params.set('limit', limit);
+
+      const qs = params.toString();
+      const url = `${window.location.origin}/feed.xml${qs ? '?' + qs : ''}`;
+      el('instantRssUrlPreview').textContent = url;
+    }
+
+    el('customFeedName').addEventListener('input', (e) => {
+      el('customFeedSlug').value = slugify(e.target.value);
+    });
+    el('customFeedQuery').addEventListener('input', updateInstantRssPreviewUrl);
+    el('customFeedLimit').addEventListener('change', updateInstantRssPreviewUrl);
+
+    el('copyInstantRssBtn').addEventListener('click', () => {
+      const url = el('instantRssUrlPreview').textContent;
+      navigator.clipboard.writeText(url);
+      showToast('URL RSS copiada al portapapeles');
+    });
+
+    el('saveCustomFeedBtn').addEventListener('click', async () => {
+      const name = el('customFeedName').value.trim();
+      const slug = el('customFeedSlug').value.trim() || slugify(name);
+      if (!name) {
+        showToast('Ingresa un nombre para identificar tu feed público');
+        el('customFeedName').focus();
+        return;
+      }
+
+      try {
+        const res = await apiFetch('/api/custom-feeds', {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            slug,
+            sections: Array.from(state.builder.include),
+            exclude_sections: Array.from(state.builder.exclude),
+            search_query: el('customFeedQuery').value.trim(),
+            max_items: parseInt(el('customFeedLimit').value, 10) || 25
+          })
+        });
+        await navigator.clipboard.writeText(res.public_url).catch(() => {});
+        showToast(`Feed guardado y link copiado: ${res.public_url}`);
+        el('customFeedName').value = '';
+        el('customFeedSlug').value = '';
+        await loadCustomFeeds();
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
+
+    function openRssBuilderFromCurrentView() {
+      el('sourcesManagerSection').classList.add('hidden');
+      el('rssBuilderSection').classList.remove('hidden');
+
+      state.builder.include.clear();
+      state.builder.exclude.clear();
+
+      if (state.activeFilter.mode === 'section' && state.activeFilter.section) {
+        state.builder.include.add(state.activeFilter.section);
+        el('customFeedName').value = `Feed ${state.activeFilter.section}`;
+        el('customFeedSlug').value = slugify(`feed-${state.activeFilter.section}`);
+      } else if (state.activeFilter.mode === 'main_no_yt') {
+        state.builder.exclude.add('Youtube');
+      }
+
+      if (state.activeFilter.q) {
+        el('customFeedQuery').value = state.activeFilter.q;
+      }
+
+      renderBuilderSectionChips();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    el('createRssFromViewBtn').addEventListener('click', openRssBuilderFromCurrentView);
+    el('openBuilderModeBtn').addEventListener('click', () => {
+      closeMobileSidebar();
+      openRssBuilderFromCurrentView();
+    });
+    el('newCustomFeedSidebarBtn').addEventListener('click', () => {
+      closeMobileSidebar();
+      openRssBuilderFromCurrentView();
+    });
+    el('closeBuilderBtn').addEventListener('click', () => {
+      el('rssBuilderSection').classList.add('hidden');
+    });
+
+    /* ===============================================================
+       GESTOR DE FUENTES & CONFIG.YAML
+    =============================================================== */
+    async function loadSources() {
+      const data = await apiFetch('/api/sources');
+      state.sources = data.sources || [];
+      renderSourcesGrouped();
+    }
+
+    function renderSourcesGrouped() {
+      const container = el('sourcesGroupedContainer');
+      const datalist = el('existingSectionsDatalist');
+      container.innerHTML = '';
+      datalist.innerHTML = '';
+
+      const grouped = {};
+      state.sources.forEach((s) => {
+        grouped[s.section] = grouped[s.section] || [];
+        grouped[s.section].push(s);
+      });
+
+      Object.keys(grouped).sort().forEach((sec) => {
+        const opt = document.createElement('option');
+        opt.value = sec;
+        datalist.appendChild(opt);
+
+        const groupEl = document.createElement('div');
+        groupEl.className = 'sources-section-group';
+
+        const rowsHtml = grouped[sec]
+          .map((item) => `
+            <div class="source-row">
+              <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                <span class="section-pill ${sectionPillClass(sec)}">${item.type}</span>
+                <span class="source-url">${item.url}</span>
+              </div>
+              <button type="button" class="btn btn-danger-ghost" data-del-id="${item.id}" data-del-url="${item.url}">
+                Quitar
+              </button>
+            </div>
+          `)
+          .join('');
+
+        groupEl.innerHTML = `
+          <div class="sources-section-header">
+            <span>#${sec}</span>
+            <span class="nav-count tabular">${grouped[sec].length} fuentes</span>
+          </div>
+          <div>${rowsHtml}</div>
+        `;
+
+        groupEl.querySelectorAll('[data-del-id]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-del-id');
+            const url = btn.getAttribute('data-del-url');
+            try {
+              await apiFetch(`/api/sources/${id}?url=${encodeURIComponent(url)}`, { method: 'DELETE' });
+              showToast('Fuente eliminada de config.yaml y BD');
+              await Promise.all([loadSources(), loadPosts()]);
+            } catch (err) {
+              showToast(err.message);
+            }
+          });
+        });
+
+        container.appendChild(groupEl);
+      });
+    }
+
+    el('addSourceForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const section = el('newSourceSection').value.trim();
+      const url = el('newSourceUrl').value.trim();
+      const type = el('newSourceType').value;
+
+      try {
+        const res = await apiFetch('/api/sources', {
+          method: 'POST',
+          body: JSON.stringify({ section, url, type })
+        });
+        el('newSourceUrl').value = '';
+        showToast(res.message || 'Fuente agregada');
+        await Promise.all([loadSources(), loadPosts()]);
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
+
+    async function loadYamlEditor() {
+      const data = await apiFetch('/api/config/yaml');
+      el('yamlEditorTextarea').value = data.yaml || '';
+    }
+
+    el('reloadYamlBtn').addEventListener('click', async () => {
+      await loadYamlEditor();
+      showToast('config.yaml recargado');
+    });
+
+    el('saveYamlBtn').addEventListener('click', async () => {
+      const rawYaml = el('yamlEditorTextarea').value;
+      try {
+        const res = await apiFetch('/api/config/yaml', {
+          method: 'PUT',
+          body: JSON.stringify({ yaml: rawYaml })
+        });
+        el('yamlEditorTextarea').value = res.yaml || rawYaml;
+        showToast(res.message || 'config.yaml actualizado');
+        await Promise.all([loadSources(), loadPosts()]);
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
+
+    document.querySelectorAll('[data-config-tab]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('[data-config-tab]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.getAttribute('data-config-tab');
+        if (tab === 'yaml') {
+          el('configVisualPane').classList.add('hidden');
+          el('configYamlPane').classList.remove('hidden');
+          await loadYamlEditor();
+        } else {
+          el('configYamlPane').classList.add('hidden');
+          el('configVisualPane').classList.remove('hidden');
+        }
+      });
+    });
+
+    el('openSourcesManagerBtn').addEventListener('click', async () => {
+      closeMobileSidebar();
+      el('rssBuilderSection').classList.add('hidden');
+      el('sourcesManagerSection').classList.remove('hidden');
+      await loadSources();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    el('closeSourcesManagerBtn').addEventListener('click', () => {
+      el('sourcesManagerSection').classList.add('hidden');
+    });
+
+    /* ===============================================================
+       CONTROLES DE BÚSQUEDA, DENSIDAD Y SINCRONIZACIÓN
+    =============================================================== */
+    let searchTimer = null;
+    el('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        state.activeFilter.q = e.target.value.trim();
+        loadPosts();
+      }, 240);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        el('searchInput').focus();
+      }
+      if (e.key === 'Escape') {
+        el('readerBackdrop').classList.remove('open');
+        closeMobileSidebar();
+      }
+    });
+
+    document.querySelectorAll('[data-density]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-density]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.density = btn.getAttribute('data-density');
+        renderArticles();
+      });
+    });
+
+    el('syncNowBtn').addEventListener('click', async () => {
+      const btn = el('syncNowBtn');
+      btn.disabled = true;
+      showToast('Consultando fuentes RSS en vivo...');
+      try {
+        const res = await apiFetch('/api/fetch', { method: 'POST' });
+        showToast(res.message || 'Sincronización finalizada');
+        await loadPosts();
+      } catch (err) {
+        showToast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    function closeMobileSidebar() {
+      el('sidebar').classList.remove('open');
+    }
+
+    el('mobileMenuBtn').addEventListener('click', () => {
+      el('sidebar').classList.toggle('open');
+    });
+
+    /* ===============================================================
+       INICIALIZACIÓN
+    =============================================================== */
+    (async function boot() {
+      try {
+        const status = await apiFetch('/api/auth/status');
+        if (status.authenticated) {
+          showWorkspace();
+          await initializeWorkspaceData();
+        } else {
+          showAuthScreen();
+        }
+      } catch {
+        showAuthScreen();
+      }
+    })();
+  </script>
+</body>
+</html>
