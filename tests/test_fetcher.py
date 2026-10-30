@@ -73,8 +73,11 @@ def _fake_get(monkeypatch, body):
         def raise_for_status(self):
             pass
 
-        def iter_content(self, chunk_size):
-            yield body
+        headers = {}
+
+        def __init__(self):
+            chunks = iter([body])
+            self.raw = type("Raw", (), {"read1": lambda _s, n: next(chunks, b"")})()
 
     def fake_get(url, **kwargs):
         calls.update(kwargs)
@@ -106,3 +109,22 @@ def test_parse_feed_rejects_oversized(monkeypatch):
     fetcher_cls, _ = _fake_get(monkeypatch, b"x" * 100)
     with pytest.raises(ValueError):
         fetcher_cls._parse_feed("http://example.com/feed", max_bytes=10)
+
+
+def test_parse_feed_rejects_compressed(monkeypatch):
+    import pytest
+
+    fetcher_cls, calls = _fake_get(monkeypatch, b"x")
+    from src.core import fetcher as fetcher_module
+
+    orig = fetcher_module.requests.get
+
+    def gz_get(url, **kw):
+        r = orig(url, **kw)
+        r.headers = {"Content-Encoding": "gzip"}
+        return r
+
+    monkeypatch.setattr(fetcher_module.requests, "get", gz_get)
+    with pytest.raises(ValueError):
+        fetcher_cls._parse_feed("http://example.com/feed")
+    assert calls["headers"]["Accept-Encoding"] == "identity"

@@ -792,9 +792,14 @@ class Fetcher:
         """Descarga con tope de tamaño y plazo total: feedparser no tiene timeout y un feed lento cuelga el worker."""
         end = time.monotonic() + deadline
         body = bytearray()
-        with requests.get(url, timeout=10, stream=True, headers={'User-Agent': 'Mozilla/5.0'}) as response:
+        headers = {'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'identity'}
+        with requests.get(url, timeout=10, stream=True, headers=headers) as response:
             response.raise_for_status()
-            for chunk in response.iter_content(chunk_size=65536):
+            # Sin compresión no hay decompression bomb: el tope de bytes es el real
+            if response.headers.get('Content-Encoding', 'identity') != 'identity':
+                raise ValueError(f"Unsupported Content-Encoding for {url}")
+            # read1 devuelve tras cada recv, así el plazo se revisa aunque el servidor gotee bytes
+            while chunk := response.raw.read1(65536):
                 body += chunk
                 if len(body) > max_bytes or time.monotonic() > end:
                     raise ValueError(f"Feed exceeded size/time limit: {url}")
