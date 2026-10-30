@@ -58,22 +58,51 @@ def test_extract_image_from_rss():
     assert fetcher._extract_image_from_rss(entry2) == 'https://example.com/thumb.jpg'
 
 
-def test_parse_feed_uses_timeout(monkeypatch):
+def _fake_get(monkeypatch, body):
     from src.core import fetcher as fetcher_module
 
     calls = {}
 
     class FakeResponse:
-        content = b"<rss version='2.0'><channel><title>t</title></channel></rss>"
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
 
         def raise_for_status(self):
             pass
+
+        def iter_content(self, chunk_size):
+            yield body
 
     def fake_get(url, **kwargs):
         calls.update(kwargs)
         return FakeResponse()
 
     monkeypatch.setattr(fetcher_module.requests, "get", fake_get)
-    feed = fetcher_module.Fetcher._parse_feed("http://example.com/feed")
+    return fetcher_module.Fetcher, calls
+
+
+def test_parse_feed_uses_timeout(monkeypatch):
+    body = b"<rss version='2.0'><channel><title>t</title></channel></rss>"
+    fetcher_cls, calls = _fake_get(monkeypatch, body)
+    feed = fetcher_cls._parse_feed("http://example.com/feed")
     assert calls["timeout"] == 10
     assert feed.feed.title == "t"
+
+
+def test_parse_feed_does_not_open_local_paths(monkeypatch, tmp_path):
+    local = tmp_path / "secret.xml"
+    local.write_text("<rss version='2.0'><channel><title>LOCAL</title></channel></rss>")
+    fetcher_cls, _ = _fake_get(monkeypatch, str(local).encode())
+    feed = fetcher_cls._parse_feed("http://example.com/feed")
+    assert feed.feed.get("title") != "LOCAL"
+
+
+def test_parse_feed_rejects_oversized(monkeypatch):
+    import pytest
+
+    fetcher_cls, _ = _fake_get(monkeypatch, b"x" * 100)
+    with pytest.raises(ValueError):
+        fetcher_cls._parse_feed("http://example.com/feed", max_bytes=10)

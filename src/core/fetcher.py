@@ -1,4 +1,6 @@
+import io
 import os
+import time
 import json
 import hashlib
 import requests
@@ -786,11 +788,18 @@ class Fetcher:
             return None
 
     @staticmethod
-    def _parse_feed(url: str):
-        """Descarga con timeout: feedparser no lo tiene y un feed lento cuelga el worker."""
-        response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
-        response.raise_for_status()
-        return feedparser.parse(response.content)
+    def _parse_feed(url: str, max_bytes: int = 10 * 1024 * 1024, deadline: int = 30):
+        """Descarga con tope de tamaño y plazo total: feedparser no tiene timeout y un feed lento cuelga el worker."""
+        end = time.monotonic() + deadline
+        body = bytearray()
+        with requests.get(url, timeout=10, stream=True, headers={'User-Agent': 'Mozilla/5.0'}) as response:
+            response.raise_for_status()
+            for chunk in response.iter_content(chunk_size=65536):
+                body += chunk
+                if len(body) > max_bytes or time.monotonic() > end:
+                    raise ValueError(f"Feed exceeded size/time limit: {url}")
+        # BytesIO evita que feedparser trate el contenido como ruta local
+        return feedparser.parse(io.BytesIO(bytes(body)))
 
     def fetch_rss_feed(self, url: str) -> Dict[str, Any]:
         self.logger.info(f"Fetching RSS feed from {url}")
