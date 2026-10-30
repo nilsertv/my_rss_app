@@ -56,3 +56,24 @@ def test_extract_image_from_rss():
     entry2.media_thumbnail = [{'url': 'https://example.com/thumb.jpg'}]
     entry2.enclosures = []
     assert fetcher._extract_image_from_rss(entry2) == 'https://example.com/thumb.jpg'
+
+
+def test_parse_feed_uses_timeout(monkeypatch):
+    from src.core import fetcher as fetcher_module
+
+    calls = {}
+
+    class FakeResponse:
+        content = b"<rss version='2.0'><channel><title>t</title></channel></rss>"
+
+        def raise_for_status(self):
+            pass
+
+    def fake_get(url, **kwargs):
+        calls.update(kwargs)
+        return FakeResponse()
+
+    monkeypatch.setattr(fetcher_module.requests, "get", fake_get)
+    feed = fetcher_module.Fetcher._parse_feed("http://example.com/feed")
+    assert calls["timeout"] == 10
+    assert feed.feed.title == "t"

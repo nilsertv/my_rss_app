@@ -785,10 +785,17 @@ class Fetcher:
         except Exception:
             return None
 
+    @staticmethod
+    def _parse_feed(url: str):
+        """Descarga con timeout: feedparser no lo tiene y un feed lento cuelga el worker."""
+        response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+        response.raise_for_status()
+        return feedparser.parse(response.content)
+
     def fetch_rss_feed(self, url: str) -> Dict[str, Any]:
         self.logger.info(f"Fetching RSS feed from {url}")
         try:
-            feed = feedparser.parse(url)
+            feed = self._parse_feed(url)
             if not feed.entries:
                 self.logger.warning(f"No entries found in RSS feed: {url}")
                 return {"url": url, "title": "No Entries Found", "content": "", "image_url": None}
@@ -807,7 +814,7 @@ class Fetcher:
     def fetch_youtube(self, feed_url: str) -> Dict[str, Any]:
         self.logger.info(f"Fetching YouTube content from {feed_url}")
         try:
-            feed = feedparser.parse(feed_url)
+            feed = self._parse_feed(feed_url)
             if not feed.entries:
                 self.logger.warning(f"No entries found for YouTube channel: {feed_url}")
                 return {"url": feed_url, "title": "No Videos Found", "content": "", "image_url": None}
