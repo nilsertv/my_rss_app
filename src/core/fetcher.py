@@ -1,6 +1,7 @@
 import io
 import os
 import time
+from urllib.parse import urljoin, urlparse
 import json
 import hashlib
 import requests
@@ -788,23 +789,31 @@ class Fetcher:
             return None
 
     @staticmethod
-    def _parse_feed(url: str, max_bytes: int = 10 * 1024 * 1024, deadline: int = 30):
-        """Descarga con tope de tamaño y plazo total: feedparser no tiene timeout y un feed lento cuelga el worker."""
+    def _parse_feed(url: str, max_bytes: int = 10 * 1024 * 1024, deadline: int = 30, max_hops: int = 5):
+        """Descarga con tope de tamaño, plazo total y redirects manuales: feedparser no tiene timeout y un feed lento cuelga el worker."""
         end = time.monotonic() + deadline
-        body = bytearray()
         headers = {'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'identity'}
-        with requests.get(url, timeout=10, stream=True, headers=headers) as response:
-            response.raise_for_status()
-            # Sin compresión no hay decompression bomb: el tope de bytes es el real
-            if response.headers.get('Content-Encoding', 'identity') != 'identity':
-                raise ValueError(f"Unsupported Content-Encoding for {url}")
-            # read1 devuelve tras cada recv, así el plazo se revisa aunque el servidor gotee bytes
-            while chunk := response.raw.read1(65536):
-                body += chunk
-                if len(body) > max_bytes or time.monotonic() > end:
-                    raise ValueError(f"Feed exceeded size/time limit: {url}")
-        # BytesIO evita que feedparser trate el contenido como ruta local
-        return feedparser.parse(io.BytesIO(bytes(body)))
+        for _ in range(max_hops + 1):
+            # allow_redirects=False: requests leería sin tope el cuerpo de cada redirect intermedio
+            with requests.get(url, timeout=10, stream=True, allow_redirects=False, headers=headers) as response:
+                if response.is_redirect:
+                    url = urljoin(url, response.headers['Location'])
+                    if urlparse(url).scheme not in ('http', 'https') or time.monotonic() > end:
+                        raise ValueError(f"Invalid redirect or deadline exceeded: {url}")
+                    continue
+                response.raise_for_status()
+                # Sin compresión no hay decompression bomb: el tope de bytes es el real
+                if response.headers.get('Content-Encoding', 'identity') != 'identity':
+                    raise ValueError(f"Unsupported Content-Encoding for {url}")
+                body = bytearray()
+                # read1 devuelve tras cada recv, así el plazo se revisa aunque el servidor gotee bytes
+                while chunk := response.raw.read1(65536):
+                    body += chunk
+                    if len(body) > max_bytes or time.monotonic() > end:
+                        raise ValueError(f"Feed exceeded size/time limit: {url}")
+                # BytesIO evita que feedparser trate el contenido como ruta local
+                return feedparser.parse(io.BytesIO(bytes(body)))
+        raise ValueError(f"Too many redirects: {url}")
 
     def fetch_rss_feed(self, url: str) -> Dict[str, Any]:
         self.logger.info(f"Fetching RSS feed from {url}")

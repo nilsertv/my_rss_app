@@ -74,6 +74,7 @@ def _fake_get(monkeypatch, body):
             pass
 
         headers = {}
+        is_redirect = False
 
         def __init__(self):
             chunks = iter([body])
@@ -128,3 +129,37 @@ def test_parse_feed_rejects_compressed(monkeypatch):
     with pytest.raises(ValueError):
         fetcher_cls._parse_feed("http://example.com/feed")
     assert calls["headers"]["Accept-Encoding"] == "identity"
+
+
+def test_parse_feed_follows_redirects_without_reading_body(monkeypatch):
+    import pytest
+    from src.core import fetcher as fetcher_module
+
+    body = b"<rss version='2.0'><channel><title>final</title></channel></rss>"
+    fetcher_cls, calls = _fake_get(monkeypatch, body)
+    orig = fetcher_module.requests.get
+    seen = []
+
+    def redirect_get(url, **kw):
+        r = orig(url, **kw)
+        seen.append(url)
+        if url.endswith("/old"):
+            r.is_redirect = True
+            r.headers = {"Location": "/new"}
+        return r
+
+    monkeypatch.setattr(fetcher_module.requests, "get", redirect_get)
+    feed = fetcher_cls._parse_feed("http://example.com/old")
+    assert seen == ["http://example.com/old", "http://example.com/new"]
+    assert calls["allow_redirects"] is False
+    assert feed.feed.title == "final"
+
+    def bad_scheme(url, **kw):
+        r = orig(url, **kw)
+        r.is_redirect = True
+        r.headers = {"Location": "file:///etc/passwd"}
+        return r
+
+    monkeypatch.setattr(fetcher_module.requests, "get", bad_scheme)
+    with pytest.raises(ValueError):
+        fetcher_cls._parse_feed("http://example.com/old")
