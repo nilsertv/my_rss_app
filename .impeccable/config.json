@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "src/templates/index.html"
+        ],
+        "createdAt": "2026-10-31T00:54:19.940Z",
+        "reason": "user confirmed: chose the 'Mesa de redacción' direction (warm paper ground) when asked to pick the visual direction"
+      }
+    ]
+  }
+}

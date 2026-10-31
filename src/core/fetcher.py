@@ -103,6 +103,16 @@ _session.mount("http://", _SafeAdapter())
 _session.mount("https://", _SafeAdapter())
 
 
+def merge_feed_posts(picks: List[Dict[str, Any]], rule_posts: List[Dict[str, Any]], max_items: int, has_rules: bool) -> List[Dict[str, Any]]:
+    """Feed híbrido: los picks manuales siempre entran; las reglas rellenan hasta max_items sin duplicar."""
+    if not has_rules:
+        return sorted(picks, key=lambda p: p['timestamp'], reverse=True)
+    picked_ids = {p['id'] for p in picks}
+    extra = [p for p in rule_posts if p['id'] not in picked_ids]
+    merged = picks + extra[:max(0, max_items - len(picks))]
+    return sorted(merged, key=lambda p: p['timestamp'], reverse=True)
+
+
 class Fetcher:
     def __init__(self, config: Dict[str, Any]):
         self.logger = setup_logger(name='FetcherLogger', log_file='fetcher.log')
@@ -202,7 +212,17 @@ class Fetcher:
                             exclude_sections TEXT DEFAULT '',
                             search_query TEXT DEFAULT '',
                             max_items INTEGER DEFAULT 25,
+                            manual BOOLEAN DEFAULT FALSE,
                             created_at TIMESTAMPTZ DEFAULT NOW()
+                        )
+                    ''')
+                    cursor.execute("ALTER TABLE custom_feeds ADD COLUMN IF NOT EXISTS manual BOOLEAN DEFAULT FALSE")
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS feed_picks (
+                            slug TEXT NOT NULL,
+                            post_id INTEGER NOT NULL REFERENCES rss_history(id) ON DELETE CASCADE,
+                            created_at TIMESTAMPTZ DEFAULT NOW(),
+                            PRIMARY KEY (slug, post_id)
                         )
                     ''')
                     conn.commit()
@@ -438,7 +458,7 @@ class Fetcher:
                 with self.get_connection() as conn:
                     with conn.cursor() as cursor:
                         cursor.execute("""
-                            SELECT id, slug, name, sections, exclude_sections, search_query, max_items, created_at
+                            SELECT id, slug, name, sections, exclude_sections, search_query, max_items, created_at, manual
                             FROM custom_feeds
                             ORDER BY created_at DESC
                         """)
@@ -452,7 +472,8 @@ class Fetcher:
                                 'exclude_sections': [s for s in (r[4] or '').split(',') if s],
                                 'search_query': r[5] or '',
                                 'max_items': r[6] or 25,
-                                'created_at': r[7].isoformat() if hasattr(r[7], 'isoformat') else str(r[7])
+                                'created_at': r[7].isoformat() if hasattr(r[7], 'isoformat') else str(r[7]),
+                                'manual': bool(r[8])
                             }
                             for r in rows
                         ]
@@ -482,9 +503,10 @@ class Fetcher:
         sections: Optional[List[str]] = None,
         exclude_sections: Optional[List[str]] = None,
         search_query: str = '',
-        max_items: int = 25
+        max_items: int = 25,
+        manual: bool = False
     ) -> Dict[str, Any]:
-        """Crea o actualiza un feed público personalizado."""
+        """Crea o actualiza un feed público personalizado. manual=True ignora las reglas y sirve solo los picks."""
         import re
         name = (name or '').strip()
         slug = re.sub(r'[^a-z0-9-]+', '-', (slug or name).strip().lower()).strip('-')
@@ -500,14 +522,15 @@ class Fetcher:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        INSERT INTO custom_feeds (slug, name, sections, exclude_sections, search_query, max_items)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        INSERT INTO custom_feeds (slug, name, sections, exclude_sections, search_query, max_items, manual)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (slug) DO UPDATE
                         SET name = EXCLUDED.name,
                             sections = EXCLUDED.sections,
                             exclude_sections = EXCLUDED.exclude_sections,
                             search_query = EXCLUDED.search_query,
-                            max_items = EXCLUDED.max_items
+                            max_items = EXCLUDED.max_items,
+                            manual = EXCLUDED.manual
                         RETURNING id, created_at
                     """, (
                         slug,
@@ -515,7 +538,8 @@ class Fetcher:
                         ','.join(sections_list),
                         ','.join(exclude_list),
                         search_query,
-                        max_items
+                        max_items,
+                        bool(manual)
                     ))
                     row = cursor.fetchone()
                     conn.commit()
@@ -527,6 +551,7 @@ class Fetcher:
                         'exclude_sections': exclude_list,
                         'search_query': search_query,
                         'max_items': max_items,
+                        'manual': bool(manual),
                         'created_at': row[1].isoformat() if row and hasattr(row[1], 'isoformat') else None
                     }
 
@@ -540,6 +565,7 @@ class Fetcher:
             'exclude_sections': exclude_list,
             'search_query': search_query,
             'max_items': max_items,
+            'manual': bool(manual),
             'created_at': datetime.now().isoformat()
         }
         feeds.insert(0, entry)
@@ -563,6 +589,73 @@ class Fetcher:
             self._custom_feeds_fallback_file().write_text(json.dumps(filtered, ensure_ascii=False, indent=2), encoding='utf-8')
             return True
         return False
+
+    def add_pick(self, slug: str, post_id: int) -> bool:
+        """Agrega un artículo a mano a un feed. False si no hay BD o el artículo no existe; idempotente."""
+        if not self.pool:
+            return False
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO feed_picks (slug, post_id) SELECT %s, id FROM rss_history WHERE id = %s "
+                        "ON CONFLICT DO NOTHING",
+                        (slug, post_id)
+                    )
+                    cursor.execute("SELECT 1 FROM feed_picks WHERE slug = %s AND post_id = %s", (slug, post_id))
+                    found = cursor.fetchone() is not None
+                    conn.commit()
+                    return found
+        except Exception as e:
+            self.logger.error(f"Error adding pick: {e}")
+            return False
+
+    def remove_pick(self, slug: str, post_id: int) -> bool:
+        if not self.pool:
+            return False
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM feed_picks WHERE slug = %s AND post_id = %s", (slug, post_id))
+                deleted = cursor.rowcount > 0
+                conn.commit()
+                return deleted
+
+    def get_picks(self, slug: str) -> List[Dict[str, Any]]:
+        """Artículos elegidos a mano para un feed, del más reciente al más antiguo."""
+        if not self.pool:
+            return []
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT h.id, h.url, h.title, h.content, h.section, h.image_url, h.timestamp
+                        FROM feed_picks p JOIN rss_history h ON h.id = p.post_id
+                        WHERE p.slug = %s ORDER BY h.timestamp DESC
+                    """, (slug,))
+                    return [self._row_to_post(r) for r in cursor.fetchall()]
+        except Exception as e:
+            self.logger.error(f"Error getting picks: {e}")
+            return []
+
+    def get_feed_posts(self, feed_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Contenido de un feed personalizado: picks manuales + coincidencias de reglas, sin duplicados (solo picks si es manual)."""
+        max_items = int(feed_cfg.get('max_items', 25))
+        picks = self.get_picks(feed_cfg['slug'])
+        has_rules = not feed_cfg.get('manual')
+        rule_posts = self.query_posts(
+            sections=feed_cfg.get('sections') or None,
+            exclude_sections=feed_cfg.get('exclude_sections') or None,
+            search_query=feed_cfg.get('search_query') or None,
+            limit=max_items
+        ) if has_rules else []
+        return merge_feed_posts(picks, rule_posts, max_items, has_rules)
+
+    @staticmethod
+    def _row_to_post(r) -> Dict[str, Any]:
+        return {
+            'id': r[0], 'url': r[1], 'title': r[2], 'content': r[3], 'section': r[4], 'image_url': r[5],
+            'timestamp': r[6].isoformat() if hasattr(r[6], 'isoformat') else str(r[6])
+        }
 
     @staticmethod
     def generate_url_hash(url: str) -> str:
@@ -656,18 +749,7 @@ class Fetcher:
                 with conn.cursor() as cursor:
                     cursor.execute(query, tuple(params))
                     rows = cursor.fetchall()
-                    return [
-                        {
-                            'id': r[0],
-                            'url': r[1],
-                            'title': r[2],
-                            'content': r[3],
-                            'section': r[4],
-                            'image_url': r[5],
-                            'timestamp': r[6].isoformat() if hasattr(r[6], 'isoformat') else str(r[6])
-                        }
-                        for r in rows
-                    ]
+                    return [self._row_to_post(r) for r in rows]
         except Exception as e:
             self.logger.error(f"Error querying posts: {e}")
             return []

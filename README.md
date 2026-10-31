@@ -182,6 +182,15 @@ docker build -t my-rss-app .
 docker run -d my-rss-app
 ```
 
+### 🧭 Feeds públicos curados y dominio (Coolify)
+
+Cada feed personalizado se sirve en `https://<dominio>/<slug>.xml` (también en `/feeds/<slug>.xml`). Un feed combina reglas (secciones, palabra clave) con entradas elegidas a mano desde el lector, sin duplicados; con la opción "solo entradas elegidas a mano" ignora las reglas.
+
+- Dominio de producción: `feed-rss.ntv-app.com` (feed de Peruinformado: `https://feed-rss.ntv-app.com/peruinformado.xml`).
+- Variable `APP_URL=https://feed-rss.ntv-app.com`: las URLs públicas que muestra el panel usan este valor.
+- En Coolify: agrega el dominio `feed-rss.ntv-app.com` a la aplicación y apunta su registro DNS al servidor.
+- En el panel, crea el feed con "Crear feed peruinformado" y agrega entradas con el botón Agregar (atajos: `j`/`k` navegar, `a` agregar o quitar, `/` buscar).
+
 ### ☁️ Despliegue en Fly.io
 
 #### 1. Crear el volumen persistente

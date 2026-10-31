@@ -165,7 +165,7 @@ def test_custom_feed_creation_requires_auth_but_public_xml_is_open(client):
     assert create_res.status_code == 201
     feed_info = create_res.get_json()
     assert feed_info['feed']['slug'] == 'ifttt-policiales'
-    assert feed_info['public_url'].endswith('/feeds/ifttt-policiales.xml')
+    assert feed_info['public_url'].endswith('/ifttt-policiales.xml')
 
     # Now access the public custom RSS XML WITHOUT any authentication headers/cookies
     test_client.post('/api/auth/logout')
@@ -175,3 +175,45 @@ def test_custom_feed_creation_requires_auth_but_public_xml_is_open(client):
     assert b"<title>IFTTT Policiales</title>" in public_xml_res.data
     assert b"<rss" in public_xml_res.data
 
+
+
+def test_root_slug_xml_serves_custom_feed(client):
+    test_client, _ = client
+    headers = {'Authorization': 'Bearer test-secret-token'}
+    created = test_client.post('/api/custom-feeds', headers=headers, json={'name': 'Peruinformado', 'slug': 'peruinformado'})
+    assert created.status_code == 201
+    response = test_client.get('/peruinformado.xml')
+    assert response.status_code == 200
+    assert 'xml' in response.mimetype
+    assert test_client.get('/no-existe.xml').status_code == 404
+
+
+def test_picks_endpoints_require_auth_and_existing_feed(client):
+    test_client, _ = client
+    headers = {'Authorization': 'Bearer test-secret-token'}
+    assert test_client.post('/api/custom-feeds/peruinformado/picks', json={'post_id': 1}).status_code == 401
+    assert test_client.get('/api/custom-feeds/peruinformado/picks').status_code == 401
+    assert test_client.post('/api/custom-feeds/nada/picks', headers=headers, json={'post_id': 1}).status_code == 404
+    test_client.post('/api/custom-feeds', headers=headers, json={'name': 'Peruinformado'})
+    assert test_client.post('/api/custom-feeds/peruinformado/picks', headers=headers, json={}).status_code == 400
+
+
+def test_api_posts_feed_param(client):
+    test_client, _ = client
+    headers = {'Authorization': 'Bearer test-secret-token'}
+    assert test_client.get('/api/posts?feed=nada', headers=headers).status_code == 404
+    test_client.post('/api/custom-feeds', headers=headers, json={'name': 'Peruinformado'})
+    res = test_client.get('/api/posts?feed=peruinformado', headers=headers)
+    assert res.status_code == 200
+    assert res.get_json()['picked_ids'] == []
+    assert res.get_json()['posts'] == []
+
+
+def test_custom_feed_manual_flag_roundtrip(client):
+    test_client, _ = client
+    headers = {'Authorization': 'Bearer test-secret-token'}
+    res = test_client.post('/api/custom-feeds', headers=headers, json={'name': 'Peruinformado', 'manual': True})
+    assert res.get_json()['feed']['manual'] is True
+    feeds = test_client.get('/api/custom-feeds', headers=headers).get_json()['feeds']
+    assert feeds[0]['manual'] is True
+    assert test_client.get('/peruinformado.xml').status_code == 200

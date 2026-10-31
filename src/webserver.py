@@ -7,6 +7,7 @@ Servidor web Flask para la plataforma My RSS App:
 from functools import wraps
 import hmac
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import sys
@@ -130,8 +131,8 @@ def require_auth(f):
 
 
 def _public_base_url() -> str:
-    """Construye la URL base pública del servidor."""
-    return request.host_url.rstrip('/')
+    """URL base pública: APP_URL si está definido (detrás del proxy request.host_url sería http://), si no el host de la petición."""
+    return (os.getenv('APP_URL') or request.host_url).rstrip('/')
 
 
 # =====================================================================
@@ -267,6 +268,7 @@ def serve_feed():
 
 @app.route('/feeds/<slug>.xml')
 @app.route('/feeds/<slug>')
+@app.route('/<slug>.xml')
 def serve_custom_feed(slug: str):
     """
     Endpoint RSS público personalizado por slug (/feeds/<slug>.xml).
@@ -282,12 +284,7 @@ def serve_custom_feed(slug: str):
                 'message': f"No existe ningún feed personalizado con el identificador '{clean_slug}'."
             }), 404
 
-        posts = fetcher.query_posts(
-            sections=feed_cfg.get('sections') or None,
-            exclude_sections=feed_cfg.get('exclude_sections') or None,
-            search_query=feed_cfg.get('search_query') or None,
-            limit=int(feed_cfg.get('max_items', 25))
-        )
+        posts = fetcher.get_feed_posts(feed_cfg)
         rss_gen = RSSGenerator(
             posts,
             title=feed_cfg.get('name', f"Feed {clean_slug}"),
@@ -336,22 +333,35 @@ def api_get_posts():
     sections_list = [s.strip() for s in sections_param.split(',') if s.strip()] if sections_param else None
     exclude_list = [s.strip() for s in exclude_param.split(',') if s.strip()] if exclude_param else None
 
-    posts = fetcher.query_posts(
-        sections=sections_list,
-        exclude_sections=exclude_list,
-        search_query=search_query,
-        limit=limit,
-        offset=offset
-    )
+    feed_slug = request.args.get('feed', '').strip().lower()
+    picked_ids = None
+    if feed_slug:
+        # Contenido real del feed público (picks + reglas, sin duplicados) y qué entradas son picks manuales.
+        feed_cfg = fetcher.get_custom_feed(feed_slug)
+        if not feed_cfg:
+            return jsonify({'error': 'Feed not found'}), 404
+        posts = fetcher.get_feed_posts(feed_cfg)
+        picked_ids = [p['id'] for p in fetcher.get_picks(feed_slug)]
+    else:
+        posts = fetcher.query_posts(
+            sections=sections_list,
+            exclude_sections=exclude_list,
+            search_query=search_query,
+            limit=limit,
+            offset=offset
+        )
     counts = fetcher.get_section_counts()
     sections = sorted(list(set(list(fetcher.sections.keys()) + list(counts.keys()))))
 
-    return jsonify({
+    response = {
         'posts': posts,
         'counts': counts,
         'total_articles': sum(counts.values()),
         'sections': sections
-    })
+    }
+    if picked_ids is not None:
+        response['picked_ids'] = picked_ids
+    return jsonify(response)
 
 
 @app.route('/api/sources', methods=['GET'])
@@ -492,7 +502,7 @@ def api_list_custom_feeds():
     base = _public_base_url()
     feeds = fetcher.list_custom_feeds()
     for f in feeds:
-        f['public_url'] = f"{base}/feeds/{f['slug']}.xml"
+        f['public_url'] = f"{base}/{f['slug']}.xml"
     return jsonify({'feeds': feeds})
 
 
@@ -507,6 +517,7 @@ def api_create_custom_feed():
     exclude_sections = data.get('exclude_sections') or []
     search_query = str(data.get('search_query', '')).strip()
     max_items = int(data.get('max_items', 25))
+    manual = bool(data.get('manual', False))
 
     if isinstance(sections, str):
         sections = [s.strip() for s in sections.split(',') if s.strip()]
@@ -521,10 +532,11 @@ def api_create_custom_feed():
             sections=sections,
             exclude_sections=exclude_sections,
             search_query=search_query,
-            max_items=max_items
+            max_items=max_items,
+            manual=manual
         )
         base = _public_base_url()
-        saved['public_url'] = f"{base}/feeds/{saved['slug']}.xml"
+        saved['public_url'] = f"{base}/{saved['slug']}.xml"
         return jsonify({
             'feed': saved,
             'public_url': saved['public_url'],
@@ -535,6 +547,40 @@ def api_create_custom_feed():
     except Exception as e:
         logger.error(f"Error saving custom feed: {e}")
         return jsonify({'error': 'No se pudo guardar el feed personalizado.'}), 500
+
+
+@app.route('/api/custom-feeds/<slug>/picks', methods=['GET'])
+@require_auth
+def api_list_picks(slug: str):
+    """IDs de los artículos elegidos a mano para un feed."""
+    fetcher = get_fetcher()
+    if not fetcher.get_custom_feed(slug):
+        return jsonify({'error': 'Feed not found'}), 404
+    return jsonify({'post_ids': [p['id'] for p in fetcher.get_picks(slug.lower())]})
+
+
+@app.route('/api/custom-feeds/<slug>/picks', methods=['POST'])
+@require_auth
+def api_add_pick(slug: str):
+    fetcher = get_fetcher()
+    if not fetcher.get_custom_feed(slug):
+        return jsonify({'error': 'Feed not found'}), 404
+    post_id = (request.get_json(silent=True) or {}).get('post_id')
+    if not isinstance(post_id, int) or isinstance(post_id, bool):
+        return jsonify({'error': 'post_id (integer) is required'}), 400
+    if not fetcher.add_pick(slug.lower(), post_id):
+        return jsonify({'error': 'Article not found or database unavailable'}), 404
+    return jsonify({'picked': True, 'post_id': post_id}), 201
+
+
+@app.route('/api/custom-feeds/<slug>/picks/<int:post_id>', methods=['DELETE'])
+@require_auth
+def api_remove_pick(slug: str, post_id: int):
+    fetcher = get_fetcher()
+    if not fetcher.get_custom_feed(slug):
+        return jsonify({'error': 'Feed not found'}), 404
+    fetcher.remove_pick(slug.lower(), post_id)
+    return jsonify({'picked': False, 'post_id': post_id})
 
 
 @app.route('/api/custom-feeds/<slug>', methods=['DELETE'])

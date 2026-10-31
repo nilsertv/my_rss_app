@@ -13,7 +13,7 @@ services:
       - IFTTT_WEBHOOK_URL=${IFTTT_WEBHOOK_URL}
       - INTERVAL=${INTERVAL:-600}
       - POST_DELAY=${POST_DELAY:-225}
-      - APP_URL=${APP_URL:-https://my-rss-app.local}
+      - APP_URL=${APP_URL:-https://feed-rss.ntv-app.com}
       - ADMIN_TOKEN=${ADMIN_TOKEN:-rss-admin-2026}
     volumes:
       - rss_data:/data
