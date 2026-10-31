@@ -175,3 +175,24 @@ def test_custom_feed_creation_requires_auth_but_public_xml_is_open(client):
     assert b"<title>IFTTT Policiales</title>" in public_xml_res.data
     assert b"<rss" in public_xml_res.data
 
+
+
+def test_root_slug_xml_serves_custom_feed(client):
+    test_client, _ = client
+    headers = {'Authorization': 'Bearer test-secret-token'}
+    created = test_client.post('/api/custom-feeds', headers=headers, json={'name': 'Peruinformado', 'slug': 'peruinformado'})
+    assert created.status_code == 201
+    response = test_client.get('/peruinformado.xml')
+    assert response.status_code == 200
+    assert 'xml' in response.mimetype
+    assert test_client.get('/no-existe.xml').status_code == 404
+
+
+def test_picks_endpoints_require_auth_and_existing_feed(client):
+    test_client, _ = client
+    headers = {'Authorization': 'Bearer test-secret-token'}
+    assert test_client.post('/api/custom-feeds/peruinformado/picks', json={'post_id': 1}).status_code == 401
+    assert test_client.get('/api/custom-feeds/peruinformado/picks').status_code == 401
+    assert test_client.post('/api/custom-feeds/nada/picks', headers=headers, json={'post_id': 1}).status_code == 404
+    test_client.post('/api/custom-feeds', headers=headers, json={'name': 'Peruinformado'})
+    assert test_client.post('/api/custom-feeds/peruinformado/picks', headers=headers, json={}).status_code == 400

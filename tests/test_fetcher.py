@@ -195,3 +195,31 @@ def test_parse_feed_blocks_loopback_server():
             Fetcher._parse_feed(f"http://127.0.0.1:{srv.server_port}/")
     finally:
         srv.shutdown()
+
+
+def _post(i, ts):
+    return {"id": i, "url": f"http://x/{i}", "title": f"t{i}", "timestamp": ts}
+
+
+def test_merge_feed_posts_keeps_picks_dedupes_and_sorts():
+    from src.core.fetcher import merge_feed_posts
+
+    picks = [_post(1, "2026-01-01"), _post(2, "2026-01-05")]
+    rules = [_post(2, "2026-01-05"), _post(3, "2026-01-09"), _post(4, "2026-01-08")]
+    merged = merge_feed_posts(picks, rules, max_items=3, has_rules=True)
+    assert [p["id"] for p in merged] == [3, 2, 1]  # 2 not duplicated; rules fill only the free slot
+
+
+def test_merge_feed_posts_never_drops_picks_over_limit():
+    from src.core.fetcher import merge_feed_posts
+
+    picks = [_post(i, f"2026-01-0{i}") for i in range(1, 5)]
+    merged = merge_feed_posts(picks, [_post(9, "2026-02-01")], max_items=2, has_rules=True)
+    assert sorted(p["id"] for p in merged) == [1, 2, 3, 4]
+
+
+def test_merge_feed_posts_without_rules_serves_only_picks():
+    from src.core.fetcher import merge_feed_posts
+
+    merged = merge_feed_posts([_post(1, "2026-01-01")], [_post(2, "2026-01-02")], max_items=25, has_rules=False)
+    assert [p["id"] for p in merged] == [1]
