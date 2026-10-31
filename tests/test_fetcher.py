@@ -223,3 +223,15 @@ def test_merge_feed_posts_without_rules_serves_only_picks():
 
     merged = merge_feed_posts([_post(1, "2026-01-01")], [_post(2, "2026-01-02")], max_items=25, has_rules=False)
     assert [p["id"] for p in merged] == [1]
+
+
+def test_get_feed_posts_manual_serves_only_picks(monkeypatch):
+    from src.core.fetcher import Fetcher
+
+    fetcher = Fetcher({"sections": {}, "database_url": ""})
+    monkeypatch.setattr(fetcher, "get_picks", lambda slug: [_post(1, "2026-01-01")])
+    monkeypatch.setattr(fetcher, "query_posts", lambda **kw: [_post(2, "2026-01-02")])
+    manual = fetcher.get_feed_posts({"slug": "p", "max_items": 25, "manual": True})
+    hybrid = fetcher.get_feed_posts({"slug": "p", "max_items": 25, "manual": False})
+    assert [p["id"] for p in manual] == [1]
+    assert [p["id"] for p in hybrid] == [2, 1]

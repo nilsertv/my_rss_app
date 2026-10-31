@@ -212,9 +212,11 @@ class Fetcher:
                             exclude_sections TEXT DEFAULT '',
                             search_query TEXT DEFAULT '',
                             max_items INTEGER DEFAULT 25,
+                            manual BOOLEAN DEFAULT FALSE,
                             created_at TIMESTAMPTZ DEFAULT NOW()
                         )
                     ''')
+                    cursor.execute("ALTER TABLE custom_feeds ADD COLUMN IF NOT EXISTS manual BOOLEAN DEFAULT FALSE")
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS feed_picks (
                             slug TEXT NOT NULL,
@@ -456,7 +458,7 @@ class Fetcher:
                 with self.get_connection() as conn:
                     with conn.cursor() as cursor:
                         cursor.execute("""
-                            SELECT id, slug, name, sections, exclude_sections, search_query, max_items, created_at
+                            SELECT id, slug, name, sections, exclude_sections, search_query, max_items, created_at, manual
                             FROM custom_feeds
                             ORDER BY created_at DESC
                         """)
@@ -470,7 +472,8 @@ class Fetcher:
                                 'exclude_sections': [s for s in (r[4] or '').split(',') if s],
                                 'search_query': r[5] or '',
                                 'max_items': r[6] or 25,
-                                'created_at': r[7].isoformat() if hasattr(r[7], 'isoformat') else str(r[7])
+                                'created_at': r[7].isoformat() if hasattr(r[7], 'isoformat') else str(r[7]),
+                                'manual': bool(r[8])
                             }
                             for r in rows
                         ]
@@ -500,9 +503,10 @@ class Fetcher:
         sections: Optional[List[str]] = None,
         exclude_sections: Optional[List[str]] = None,
         search_query: str = '',
-        max_items: int = 25
+        max_items: int = 25,
+        manual: bool = False
     ) -> Dict[str, Any]:
-        """Crea o actualiza un feed público personalizado."""
+        """Crea o actualiza un feed público personalizado. manual=True ignora las reglas y sirve solo los picks."""
         import re
         name = (name or '').strip()
         slug = re.sub(r'[^a-z0-9-]+', '-', (slug or name).strip().lower()).strip('-')
@@ -518,14 +522,15 @@ class Fetcher:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        INSERT INTO custom_feeds (slug, name, sections, exclude_sections, search_query, max_items)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        INSERT INTO custom_feeds (slug, name, sections, exclude_sections, search_query, max_items, manual)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (slug) DO UPDATE
                         SET name = EXCLUDED.name,
                             sections = EXCLUDED.sections,
                             exclude_sections = EXCLUDED.exclude_sections,
                             search_query = EXCLUDED.search_query,
-                            max_items = EXCLUDED.max_items
+                            max_items = EXCLUDED.max_items,
+                            manual = EXCLUDED.manual
                         RETURNING id, created_at
                     """, (
                         slug,
@@ -533,7 +538,8 @@ class Fetcher:
                         ','.join(sections_list),
                         ','.join(exclude_list),
                         search_query,
-                        max_items
+                        max_items,
+                        bool(manual)
                     ))
                     row = cursor.fetchone()
                     conn.commit()
@@ -545,6 +551,7 @@ class Fetcher:
                         'exclude_sections': exclude_list,
                         'search_query': search_query,
                         'max_items': max_items,
+                        'manual': bool(manual),
                         'created_at': row[1].isoformat() if row and hasattr(row[1], 'isoformat') else None
                     }
 
@@ -558,6 +565,7 @@ class Fetcher:
             'exclude_sections': exclude_list,
             'search_query': search_query,
             'max_items': max_items,
+            'manual': bool(manual),
             'created_at': datetime.now().isoformat()
         }
         feeds.insert(0, entry)
@@ -630,13 +638,10 @@ class Fetcher:
             return []
 
     def get_feed_posts(self, feed_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Contenido de un feed personalizado: picks manuales + coincidencias de reglas, sin duplicados."""
+        """Contenido de un feed personalizado: picks manuales + coincidencias de reglas, sin duplicados (solo picks si es manual)."""
         max_items = int(feed_cfg.get('max_items', 25))
         picks = self.get_picks(feed_cfg['slug'])
-        has_rules = bool(feed_cfg.get('sections') or feed_cfg.get('exclude_sections') or feed_cfg.get('search_query'))
-        # Un feed sin ninguna regla pero con picks es manual puro; sin picks conserva el comportamiento previo (últimos N).
-        if not has_rules and not picks:
-            has_rules = True
+        has_rules = not feed_cfg.get('manual')
         rule_posts = self.query_posts(
             sections=feed_cfg.get('sections') or None,
             exclude_sections=feed_cfg.get('exclude_sections') or None,
