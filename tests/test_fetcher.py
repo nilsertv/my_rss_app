@@ -84,7 +84,7 @@ def _fake_get(monkeypatch, body):
         calls.update(kwargs)
         return FakeResponse()
 
-    monkeypatch.setattr(fetcher_module.requests, "get", fake_get)
+    monkeypatch.setattr(fetcher_module._session, "get", fake_get)
     return fetcher_module.Fetcher, calls
 
 
@@ -118,14 +118,14 @@ def test_parse_feed_rejects_compressed(monkeypatch):
     fetcher_cls, calls = _fake_get(monkeypatch, b"x")
     from src.core import fetcher as fetcher_module
 
-    orig = fetcher_module.requests.get
+    orig = fetcher_module._session.get
 
     def gz_get(url, **kw):
         r = orig(url, **kw)
         r.headers = {"Content-Encoding": "gzip"}
         return r
 
-    monkeypatch.setattr(fetcher_module.requests, "get", gz_get)
+    monkeypatch.setattr(fetcher_module._session, "get", gz_get)
     with pytest.raises(ValueError):
         fetcher_cls._parse_feed("http://example.com/feed")
     assert calls["headers"]["Accept-Encoding"] == "identity"
@@ -137,7 +137,7 @@ def test_parse_feed_follows_redirects_without_reading_body(monkeypatch):
 
     body = b"<rss version='2.0'><channel><title>final</title></channel></rss>"
     fetcher_cls, calls = _fake_get(monkeypatch, body)
-    orig = fetcher_module.requests.get
+    orig = fetcher_module._session.get
     seen = []
 
     def redirect_get(url, **kw):
@@ -148,7 +148,7 @@ def test_parse_feed_follows_redirects_without_reading_body(monkeypatch):
             r.headers = {"Location": "/new"}
         return r
 
-    monkeypatch.setattr(fetcher_module.requests, "get", redirect_get)
+    monkeypatch.setattr(fetcher_module._session, "get", redirect_get)
     feed = fetcher_cls._parse_feed("http://example.com/old")
     assert seen == ["http://example.com/old", "http://example.com/new"]
     assert calls["allow_redirects"] is False
@@ -160,6 +160,38 @@ def test_parse_feed_follows_redirects_without_reading_body(monkeypatch):
         r.headers = {"Location": "file:///etc/passwd"}
         return r
 
-    monkeypatch.setattr(fetcher_module.requests, "get", bad_scheme)
+    monkeypatch.setattr(fetcher_module._session, "get", bad_scheme)
     with pytest.raises(ValueError):
         fetcher_cls._parse_feed("http://example.com/old")
+
+
+def test_check_public_ip_blocks_internal_addresses():
+    import pytest
+    from src.core.fetcher import _check_public_ip
+
+    for ip in ["127.0.0.1", "10.0.0.5", "172.17.0.2", "192.168.1.1", "169.254.169.254",
+               "::1", "::ffff:127.0.0.1", "fe80::1", "0.0.0.0", "224.0.0.1"]:
+        with pytest.raises(ValueError):
+            _check_public_ip(ip)
+    _check_public_ip("8.8.8.8")
+
+
+def test_parse_feed_blocks_loopback_server():
+    import http.server
+    import threading
+    import pytest
+    from src.core.fetcher import Fetcher
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"<rss version='2.0'><channel><title>x</title></channel></rss>")
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(ValueError, match="Blocked non-public"):
+            Fetcher._parse_feed(f"http://127.0.0.1:{srv.server_port}/")
+    finally:
+        srv.shutdown()

@@ -1,4 +1,5 @@
 import io
+import ipaddress
 import os
 import time
 from urllib.parse import urljoin, urlparse
@@ -6,6 +7,9 @@ import json
 import hashlib
 import requests
 import feedparser
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 from bs4 import BeautifulSoup
 from psycopg2 import sql, extras, pool
 from datetime import datetime
@@ -48,6 +52,55 @@ def _normalize_sections_map(sections_raw: Any) -> Dict[str, List[Dict[str, str]]
         if norm_list:
             normalized[sec_name] = norm_list
     return normalized
+
+
+def _check_public_ip(ip: str) -> None:
+    """Rechaza IPs no públicas (loopback, privadas, link-local, reservadas, multicast), incluido IPv4-mapped."""
+    addr = ipaddress.ip_address(ip)
+    if addr.version == 6 and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    if not addr.is_global or addr.is_multicast:
+        raise ValueError(f"Blocked non-public address: {ip}")
+
+
+class _SafeConnectionMixin:
+    # Valida la IP realmente conectada (no la resuelta antes): cierra la ventana de DNS rebinding
+    # y cubre la URL inicial y cada redirect. ponytail: conecta (sin enviar datos) antes de cerrar.
+    def _new_conn(self):
+        sock = super()._new_conn()
+        try:
+            _check_public_ip(sock.getpeername()[0])
+        except Exception:
+            sock.close()
+            raise
+        return sock
+
+
+class _SafeHTTPConnection(_SafeConnectionMixin, HTTPConnection):
+    pass
+
+
+class _SafeHTTPSConnection(_SafeConnectionMixin, HTTPSConnection):
+    pass
+
+
+class _SafeHTTPPool(HTTPConnectionPool):
+    ConnectionCls = _SafeHTTPConnection
+
+
+class _SafeHTTPSPool(HTTPSConnectionPool):
+    ConnectionCls = _SafeHTTPSConnection
+
+
+class _SafeAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {"http": _SafeHTTPPool, "https": _SafeHTTPSPool}
+
+
+_session = requests.Session()
+_session.mount("http://", _SafeAdapter())
+_session.mount("https://", _SafeAdapter())
 
 
 class Fetcher:
@@ -746,7 +799,7 @@ class Fetcher:
     def fetch_html_page(self, url: str) -> Dict[str, Any]:
         self.logger.info(f"Fetching HTML content from {url}")
         try:
-            response = requests.get(url, timeout=10)
+            response = _session.get(url, timeout=10)
             soup = BeautifulSoup(response.text, 'lxml')
 
             article = soup.find('div', class_='latest-news')
@@ -795,7 +848,7 @@ class Fetcher:
         headers = {'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'identity'}
         for _ in range(max_hops + 1):
             # allow_redirects=False: requests leería sin tope el cuerpo de cada redirect intermedio
-            with requests.get(url, timeout=10, stream=True, allow_redirects=False, headers=headers) as response:
+            with _session.get(url, timeout=10, stream=True, allow_redirects=False, headers=headers) as response:
                 if response.is_redirect:
                     url = urljoin(url, response.headers['Location'])
                     if urlparse(url).scheme not in ('http', 'https') or time.monotonic() > end:
